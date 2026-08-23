@@ -91,6 +91,32 @@ From the logs:
 - `docker run --rm hello-world` prints the greeting and exits 0
 - `id -nG` lists `docker`
 
+## Follow-up: the data directory
+
+Added 2026-08-23, same project, phase 2. Kept here rather than in its own note: it is a `mkdir`
+and a `chown`, undone by one `rm -rf`, and it belongs with the rest of this project's footprint
+outside its own repo.
+
+`/srv/gramps-web/` holds everything the Gramps Web stack cannot regenerate: the tree database,
+media, the accounts SQLite, and the search index. It is bind-mounted into the containers so the
+backup target is one directory that survives `docker compose down -v` and a full Docker purge.
+
+`/srv` rather than a home directory so that backups, restores and any future move name a path
+that does not depend on which account runs the stack.
+
+```bash
+sudo mkdir -p /srv/gramps-web/{db,media,users,index} 2>&1 | tee ~/handoff-logs/02a-mkdir-srv-gramps.log
+sudo chown -R pmn:pmn /srv/gramps-web 2>&1 | tee ~/handoff-logs/02b-chown-srv-gramps.log
+ls -la /srv/gramps-web/ 2>&1 | tee ~/handoff-logs/02c-verify-srv-gramps.log
+```
+
+The `chown` sets the starting ownership only. The container runs as root and will write into
+these directories as root, which is expected. Whether `pmn` can still read those files afterwards
+decides whether the nightly backup runs unprivileged, and that gets checked after the first boot
+rather than assumed.
+
+Rollback for this part alone: `sudo rm -rf /srv/gramps-web`. That destroys the tree.
+
 ## Rollback
 
 ```bash
