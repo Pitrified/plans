@@ -63,6 +63,10 @@ sudo apt install -y docker.io docker-compose-v2 2>&1 | tee ~/handoff-logs/01b-ap
 # 2 - let pmn talk to the daemon without elevation
 sudo usermod -aG docker pmn 2>&1 | tee ~/handoff-logs/01c-usermod-docker.log
 
+# 2b - newgrp lives in util-linux-extra, which this box does not have by default.
+# Skip only if a logout and login is used for step 3 instead.
+sudo apt install -y util-linux-extra 2>&1 | tee ~/handoff-logs/01c2-util-linux-extra.log
+
 # 3 - verify (the group only applies to new sessions, hence the fresh login)
 newgrp docker <<'EOF' 2>&1 | tee ~/handoff-logs/01d-verify-docker.log
 docker --version
@@ -102,3 +106,14 @@ in the meantime. Nothing does today.
 
 The bind-mounted Gramps data directory is outside `/var/lib/docker` and survives all of this,
 which is the point of bind-mounting it.
+
+## Outcome
+
+Done 2026-08-23. Verified from `~/handoff-logs/`: Docker 29.1.3, Compose 2.40.3, `docker.service`
+enabled and active, `hello-world` exit 0, `docker` present in `id -nG`.
+
+One correction, folded into the steps above: **`newgrp` is not installed on this box.** It lives
+in `util-linux-extra`, which a minimal Ubuntu server does not carry, so step 3 failed the first
+time (`01d`) and succeeded after installing it (`01d1`). Anything on this box that reaches for
+`newgrp` to pick up a fresh group needs that package first, or has to use a logout and login
+instead.
