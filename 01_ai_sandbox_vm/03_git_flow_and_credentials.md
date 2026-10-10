@@ -24,16 +24,12 @@ Context: [`00_start.md`](00_start.md), depends on
 
 ### SSH
 
-`~/.ssh/config` on the host:
-
-```
-Host sbx
-    HostName 10.77.0.10
-    User ai
-    ForwardAgent no
-    IdentitiesOnly yes
-    IdentityFile ~/.ssh/<key>
-```
+The wrapper carries its own SSH options, so nothing is added to
+`~/.ssh/config` and no other tool picks them up by accident: a dedicated key
+(`~/.ssh/sbx_ed25519`), `ForwardAgent=no`, `IdentitiesOnly=yes`, and its own
+`known_hosts` under `~/.local/state/sbx/`, which a rebuild clears because the
+new instance has new host keys. Git uses the same options through
+`GIT_SSH_COMMAND`.
 
 ### Git identity in the VM
 
@@ -53,11 +49,13 @@ which is the right outcome: commit or stash in the VM first.
 ### A project, the first time
 
 ```bash
-ssh sbx 'git init -q ~/projects/<proj>'
-git remote add sandbox sbx:projects/<proj>
+ssh ... 'git init -q -b <branch> projects/<proj>'
+git remote add sandbox ai@10.77.0.10:projects/<proj>
 git push sandbox <branch>
-ssh sbx 'git -C ~/projects/<proj> checkout <branch>'
 ```
+
+`updateInstead` also works on a repository with no commits yet, so the first
+push populates the working tree and no checkout step is needed.
 
 ### In
 
@@ -81,16 +79,18 @@ git push
 
 ### `sbx` wrapper
 
-Two verbs over the above, run from inside a host repo:
+`sandbox-vm/sbx`, run from inside a host repo. Written and exercised in the lab
+([`01.2_lab_run.md`](01.2_lab_run.md)).
 
 - `sbx in [branch]`: add the remote if missing, create the repo in the VM if
-  missing, push the current branch.
-- `sbx out [branch]`: fetch, show `git log -p ..sandbox/<branch>` in the pager,
-  ask, then fast-forward. It does **not** push to GitHub: that stays a separate,
-  deliberate `git push`.
-
-Plus `sbx ssh` (attach to the tmux or zellij session) and `sbx ip`. Where the
-file lives follows `00_start.md` Q1.
+  missing, push the branch. Records the project and its host path in
+  `~/.local/state/sbx/projects`, which the rebuild guard reads.
+- `sbx out [branch]`: fetch, show the new commits, ask, then fast-forward to
+  **the commit that was shown**, not to whatever the sandbox has by then. It
+  names other sandbox branches the host does not hold, stops on divergence, and
+  updates a branch that is not checked out without checking it out. It does
+  **not** push to GitHub: that stays a separate, deliberate `git push`.
+- `sbx ssh`, `sbx ip`, `sbx up`, `sbx down`, `sbx test`.
 
 ### Dotfiles
 
@@ -107,24 +107,11 @@ reach the dotfiles repo unless copied back.
 Once, in the VM, over SSH: run `claude`, open the URL in any browser, paste the
 code back.
 
-Carry out, immediately before deleting the instance, every time (the token
-refreshes itself, so an older copy may be dead):
-
-```bash
-mkdir -p ~/.local/state/sbx && chmod 700 ~/.local/state/sbx
-incus file pull sbx/home/ai/.claude/.credentials.json ~/.local/state/sbx/
-incus file pull sbx/home/ai/.claude.json              ~/.local/state/sbx/   # Q8
-chmod 600 ~/.local/state/sbx/*
-```
-
-Carry in, after the provisioning script has run:
-
-```bash
-incus file push --uid 1000 --gid 1000 --mode 600 \
-  ~/.local/state/sbx/.credentials.json sbx/home/ai/.claude/.credentials.json
-incus file push --uid 1000 --gid 1000 --mode 600 \
-  ~/.local/state/sbx/.claude.json sbx/home/ai/.claude.json
-```
+`sbx carry-out` and `sbx carry-in` move the files, and `sbx rebuild` calls
+both. Carry out happens immediately before the instance is deleted, every time:
+the token refreshes itself, so an older copy may be dead. The host copies live
+in `~/.local/state/sbx/carry/`, mode 600, and go back in owned by `ai`, mode
+600. Tested in the lab with stand-in files.
 
 The path of the credentials file is from memory. Confirm it on the first login
 with `ls -la ~/.claude`.
@@ -132,8 +119,8 @@ with `ls -la ~/.claude`.
 ### API keys
 
 `00_start.md` Q7: a `.env` on the host at `~/.local/state/sbx/sbx.env`, mode
-600, pushed to `/home/ai/.config/sbx.env` by the same carry-in step and sourced
-from the shell rc. Only keys made for the sandbox, each with a spend cap.
+600, pushed to `/home/ai/.config/sbx.env` by `sbx carry-in` and exported by the
+shell rc. Tested in the lab. Only keys made for the sandbox, each with a spend cap.
 
 ## Pitfalls
 
@@ -155,12 +142,12 @@ from the shell rc. Only keys made for the sandbox, each with a spend cap.
 - A real project round-trips: pushed in, changed and committed by the assistant
   in the VM, fetched, reviewed, fast-forwarded and pushed to GitHub from the
   host.
-- `ssh sbx 'ssh-add -l'` reports no agent.
-- `ssh sbx 'git -C ~/projects/<proj> push origin'` fails for lack of a remote
+- `sbx ssh 'ssh-add -l'` reports no agent.
+- `sbx ssh 'git -C projects/<proj> push origin'` fails for lack of a remote
   or a credential.
 - The Claude login survives a delete and relaunch of the instance.
 
 ## Rollback
 
-Remove the `sandbox` remotes (`git remote remove sandbox`), the `Host sbx`
-block, the wrapper, and `~/.local/state/sbx`.
+Remove the `sandbox` remotes (`git remote remove sandbox`), the wrapper,
+`~/.ssh/sbx_ed25519*` and `~/.local/state/sbx`.

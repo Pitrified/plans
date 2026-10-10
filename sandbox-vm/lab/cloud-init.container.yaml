@@ -1,0 +1,17 @@
+#cloud-config
+# Lab only: the container flavour of guest/cloud-init.yaml. A container cannot
+# take block volumes, so the two volumes arrive already mounted by Incus and
+# only need their ownership set.
+users:
+  - name: ai
+    uid: 1000
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    ssh_authorized_keys:
+      - __SSH_PUBKEY__
+ssh_pwauth: false
+disable_root: true
+runcmd:
+  - [mkdir, -p, /home/ai/projects, /home/ai/.cache]
+  - [chown, "ai:ai", /home/ai, /home/ai/projects, /home/ai/.cache]

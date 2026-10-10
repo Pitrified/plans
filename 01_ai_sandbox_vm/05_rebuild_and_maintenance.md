@@ -29,16 +29,21 @@ Commands are the intended shape and have not been run.
 ```
 sbx rebuild
   1. refuse if any project in the VM has commits the host has not fetched,
-     unless --force (list them)
+     unless --force (it names the project and branch)
   2. carry out: credentials, .claude.json            (phase 3)
-  3. snapshot the projects volume, labelled pre-rebuild
-  4. incus delete -f sbx
-  5. incus launch ... -p sbx --config cloud-init.user-data=...   (phase 2)
-  6. wait for cloud-init: incus exec sbx -- cloud-init status --wait
-  7. push in bootstrap and dotfiles, run the provisioning script
+  3. snapshot the projects volume, labelled pre-rebuild-<timestamp>
+  4. delete the instance
+  5. create and start it from the profile and cloud-init (phase 2)
+  6. wait for cloud-init, then for SSH
+  7. push the host's provision.sh in and run it
   8. carry in: credentials, .claude.json, sbx.env    (phase 3)
   9. run the isolation test                           (phase 1)
 ```
+
+Implemented in `sandbox-vm/sbx` and run end to end in the lab, including the
+refusal in step 1 ([`01.2_lab_run.md`](01.2_lab_run.md)). Repos such as the
+dotfiles live on the projects volume, so they are still there after a rebuild
+and need no pushing in again.
 
 Step 1 is the one that matters: a rebuild keeps the projects volume, but it is
 also the moment people stop looking at what was in the old VM.
@@ -63,9 +68,12 @@ incus storage volume snapshot restore default sbx-projects <snapshot>
 incus start sbx
 ```
 
+Restore needs the instance stopped; Incus refuses otherwise. Confirmed in the
+lab, where a deleted project came back from a snapshot.
+
 A snapshot of a block volume taken while the guest is writing is crash
-consistent, not clean. Good enough for git repos; test one restore before
-relying on it.
+consistent, not clean. Good enough for git repos. The lab pool was `dir`, so
+neither that nor a scheduled snapshot actually firing has been seen.
 
 ### Web apps
 
@@ -95,7 +103,8 @@ tailscale serve --bg <port>     # host side, pointing at a local forwarder
 
 `tailscale serve` may only accept localhost targets; if so, a `socat` or
 `ssh -L` forwarder on the host sits in between. Both routes work with the host
-headless.
+headless. The direct route, the `ssh -L` route and a `socat` forwarder on the
+host's tailnet address were tested in the lab; `tailscale serve` itself was not.
 
 ### Runbook
 
@@ -113,7 +122,7 @@ headless.
 | disk use | `incus storage info default` |
 | snapshots | `incus storage volume snapshot list default sbx-projects` |
 | rebuild | `sbx rebuild` |
-| re-check isolation | the phase 1 test script |
+| re-check isolation | `sbx test` |
 
 ### Routine upkeep
 

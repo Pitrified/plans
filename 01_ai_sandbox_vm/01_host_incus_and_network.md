@@ -11,7 +11,8 @@ the VM can use to reach the internet and nothing else. It comes first because it
 is cheap, it needs no guest decisions, and the isolation test at the end is
 worth having before anything valuable goes into a VM.
 Context: [`00_start.md`](00_start.md), host capture in
-[`01.1_host_facts.md`](01.1_host_facts.md).
+[`01.1_host_facts.md`](01.1_host_facts.md), dry run in
+[`01.2_lab_run.md`](01.2_lab_run.md).
 
 This is system-level work on g7: installs, a new group membership, firewall
 rules. Pause for approval before running it.
@@ -26,8 +27,8 @@ rules. Pause for approval before running it.
 
 ## Plan
 
-Commands are the intended shape and have not been run. Check each against the
-installed Incus version before running it.
+Steps 2 to 4 are scripted and were run in the lab against Incus 6.0.0. Step 1
+has not been run on a machine with systemd.
 
 ```bash
 # 1. install (24.04+; older hosts use the Zabbly repo)
@@ -35,62 +36,74 @@ sudo apt install incus qemu-system
 sudo adduser pmn incus-admin        # then log out and in
 incus admin init                    # btrfs loop pool, no clustering, no remote access
 
-# 2. dedicated bridge, IPv4 only
-incus network create sbxbr0 \
-  ipv4.address=10.77.0.1/24 ipv4.nat=true ipv6.address=none
+# 2-3. bridge, ACL, host guard
+sandbox-vm/host/network.sh
 
-# 3. ACL: internet only
+# 4. prove it, from a throwaway VM
+incus launch images:ubuntu/24.04/cloud sbxtest --vm --network sbxbr0
+sandbox-vm/host/isolation_test.sh sbxtest \
+  10.77.0.1:22 <host LAN address>:22 <host tailnet address>:22 \
+  <a LAN device>:<open port> <a tailnet device>:<open port>
+incus delete -f sbxtest
+```
+
+What `network.sh` creates:
+
+```bash
+incus network create sbxbr0 ipv4.address=10.77.0.1/24 ipv4.nat=true ipv6.address=none
 incus network acl create sbx-internet-only
 incus network acl rule add sbx-internet-only egress action=drop \
   destination=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,169.254.0.0/16
 incus network acl rule add sbx-internet-only egress action=allow
 incus network acl rule add sbx-internet-only ingress action=allow source=10.77.0.1/32
 incus network set sbxbr0 security.acls=sbx-internet-only
+nft -f sandbox-vm/host/host_guard.nft
 ```
 
-Notes on the rules:
+Two layers, and both are needed:
 
-- Incus ACL rules are not ordered; a `drop` wins over an `allow`. That is what
-  makes "drop the private ranges, allow the rest" work.
-- The bridge address is inside `10.0.0.0/8`, so the drop also covers the host's
-  own address on the bridge, which is the intent. DHCP and DNS from the bridge's
-  own dnsmasq are expected to keep working through Incus's baseline rules. If
-  the guest gets no address or no DNS, this is the first place to look.
-- IPv6 is off on the bridge so there is a single address family to reason about.
-- The ingress rule is what lets the host (and nothing else) open connections
-  into the VM.
+- **The ACL** keeps the sandbox off the private ranges. Incus ACL rules are not
+  ordered; a `drop` wins over an `allow`, which is what makes "drop the private
+  ranges, allow the rest" work. DHCP and DNS to the bridge's own dnsmasq keep
+  working, because Incus accepts them ahead of the ACL. Both confirmed in the lab.
+- **The host guard** keeps the sandbox off the host itself. The ACL only blocks
+  the host through addresses that fall inside the dropped ranges; an address
+  outside them (a public IPv4 on the host, for one) stayed reachable in the
+  lab. The guard is a small nftables table dropping anything new that arrives
+  from `sbxbr0` for the host, except DHCP and DNS.
 
-A throwaway VM for the test:
+The ACL applies to the bridge as a whole, so anything attached to `sbxbr0` is
+internet-only, whether or not Incus created it.
 
-```bash
-incus launch images:ubuntu/24.04/cloud sbxtest --vm --network sbxbr0
-incus exec sbxtest -- bash
-```
+IPv6 is off on the bridge so there is a single address family to reason about.
 
-Inside it:
+### Making the host guard permanent
 
-```bash
-curl -sI https://example.com | head -1          # must answer
-curl -m 5 http://10.77.0.1:22                   # host on the bridge: must time out
-curl -m 5 http://<a LAN device>                 # must time out
-curl -m 5 http://<a tailnet device, 100.x.y.z>  # must time out
-ping -c1 -W2 <the host's LAN address>           # must fail
-```
+`network.sh` loads it once; it is gone after a reboot. On g7 it has to be loaded
+at boot, before the sandbox can start (`00_start.md` Q10). The isolation test
+catches a missing guard only if a host address outside the private ranges is
+among its targets, so on g7 the test also checks `nft list table inet
+sbx_host_guard` directly.
 
-Then `incus delete -f sbxtest`.
+### Choosing the test targets
+
+The test is only as good as its targets. Each "must be blocked" target has to
+be something that **would answer** if the rules were absent: an address with a
+port that is really open. Run the test once with `network.sh --no-acl` to see
+every target reported reachable, then apply the rules. A target that is
+"blocked" in the control run proves nothing.
 
 ## Pitfalls
 
 - **Docker on the same host.** Docker sets the forward chain's default policy
   to drop, which cuts an Incus bridge off from the internet. If Docker is on g7,
-  expect to add an explicit forward rule for `sbxbr0`.
-- **The ACL may not cover traffic addressed to the host itself** on every
-  firewall backend. The tests above are the truth, not the rule list. If the
-  host is reachable, add a host-side nftables rule dropping new connections
-  from `sbxbr0` to the host other than DHCP and DNS.
-- **Tailscale routes.** Traffic from the VM to `100.64.0.0/10` would be
-  masqueraded and leave through `tailscale0` as the host. The tailnet test is
-  the one that matters most.
+  expect to add an explicit forward rule for `sbxbr0`. Not tested in the lab.
+- **Tailscale's own rules.** The lab stand-in had a tailnet address range, not
+  Tailscale's routing and firewall marks. Traffic from the VM to
+  `100.64.0.0/10` is what the ACL drops, so it should not matter, but the
+  tailnet target in the test is the one to watch on g7.
+- **A test that cannot fail.** The script stops if it cannot exec in the guest,
+  because a stopped instance otherwise reports everything as blocked.
 
 ## Out of scope
 
@@ -100,8 +113,9 @@ Then `incus delete -f sbxtest`.
 ## Done when
 
 - `incus list` works as `pmn` without sudo.
-- All five checks in the test block give the stated result.
-- The test is saved as a script so it can be re-run after any network change.
+- The control run reports every blocked target as reachable.
+- With the rules applied, `isolation_test.sh` exits 0.
+- The host guard is loaded after a reboot with no manual step.
 
 ## Rollback
 
@@ -109,5 +123,6 @@ Then `incus delete -f sbxtest`.
 incus delete -f sbxtest
 incus network delete sbxbr0
 incus network acl delete sbx-internet-only
+sudo nft delete table inet sbx_host_guard
 sudo apt purge incus && sudo rm -rf /var/lib/incus
 ```

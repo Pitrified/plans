@@ -1,0 +1,18 @@
+#!/usr/sbin/nft -f
+# The Incus ACL filters by destination range, so it only keeps the sandbox off
+# the host through addresses that fall inside those ranges. This closes the
+# rest: nothing arriving from the sandbox bridge may open a connection to the
+# host itself, on any of its addresses, except DHCP and DNS to the bridge's
+# own dnsmasq. Replies to connections the host opened are untouched.
+table inet sbx_host_guard
+delete table inet sbx_host_guard
+table inet sbx_host_guard {
+    chain input {
+        type filter hook input priority filter - 10; policy accept;
+        iifname != "sbxbr0" return
+        ct state established,related accept
+        udp dport { 53, 67 } accept
+        tcp dport 53 accept
+        counter drop
+    }
+}

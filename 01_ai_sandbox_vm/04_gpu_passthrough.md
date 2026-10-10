@@ -78,8 +78,9 @@ incus profile add sbx sbx-gpu       # GPU mode
 incus profile remove sbx sbx-gpu    # back to CPU-only
 ```
 
-A wrapper makes it one command: `sbx up` and `sbx up --gpu`, the second
-refusing to run unless `01:00.0` is bound to `vfio-pci`.
+`sbx up` and `sbx up --gpu` do the toggle. The second refuses to start while
+`01:00.0` is bound to any host driver other than `vfio-pci`. Written, never
+run: there was no GPU in the lab.
 
 ### Guest
 

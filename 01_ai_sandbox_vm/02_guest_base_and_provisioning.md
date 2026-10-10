@@ -51,40 +51,41 @@ incus profile device add sbx caches   disk pool=default source=sbx-caches
 
 ### cloud-init
 
-Kept small: it creates the user, mounts the two volumes and hands over to the
-provisioning script. Everything else lives in the script, where it is reviewed.
+`sandbox-vm/guest/cloud-init.yaml`. Kept small: it creates the user, labels and
+mounts the two volumes, and sets SSH to key-only. Everything else lives in the
+provisioning script, where it is reviewed.
 
-```yaml
-#cloud-config
-users:
-  - name: ai
-    shell: /bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    ssh_authorized_keys:
-      - <host public key>
-ssh_pwauth: false
-fs_setup:
-  - {device: /dev/disk/by-id/<projects>, filesystem: ext4, label: projects, overwrite: false}
-  - {device: /dev/disk/by-id/<caches>,   filesystem: ext4, label: caches,   overwrite: false}
-mounts:
-  - [LABEL=projects, /home/ai/projects, ext4, "defaults,nofail"]
-  - [LABEL=caches,   /home/ai/.cache,   ext4, "defaults,nofail"]
-```
+The volumes are mounted by filesystem label. On a first boot a small script,
+`sbx-disks.sh`, labels them; on a rebuild they already carry the label and are
+left alone. The script finds each disk by its **serial**, which is expected to
+carry the Incus device name (`incus_projects`, `incus_caches`), and guesses
+nothing: with no matching serial the label stays missing and the mount is
+skipped. It never touches a disk that already has a filesystem.
 
-`overwrite: false` is what keeps a rebuild from reformatting a volume that
-already holds work. Verify it on a volume with a test file before trusting it.
+This replaces cloud-init's `fs_setup`, which needs device names. Tested in a
+real VM in the lab, including a rebuild; see [`01.2_lab_run.md`](01.2_lab_run.md).
 
 ### Launch
 
 ```bash
-incus launch images:ubuntu/24.04/cloud sbx --vm -p sbx \
-  --config cloud-init.user-data="$(cat cloud-init.yaml)"
+sbx up
+```
+
+which creates the instance from the profile on first use:
+
+```bash
+incus init images:ubuntu/24.04/cloud sbx --vm -p sbx \
+  --config cloud-init.user-data="$(sed "s|__SSH_PUBKEY__|$(cat ~/.ssh/sbx_ed25519.pub)|" cloud-init.yaml)"
+incus start sbx
 ```
 
 ### Provisioning script
 
-One script, idempotent, run as `ai`. It is the reviewed list of what the VM
-contains. First version:
+`sandbox-vm/guest/provision.sh`: one script, idempotent, run as `ai`. It is the
+reviewed list of what the VM contains. `sbx provision` pushes the **host's**
+copy into the VM and runs it, so what runs is what was reviewed. Only its `base`
+section has been run (packages, git identity, cache locations); the rest is a
+first draft:
 
 - base: git, build-essential, curl, tmux, zellij, ripgrep, the existing
   `install_basics.sh` and `install_tools.sh` where they fit
@@ -101,7 +102,9 @@ itself should sit on the caches volume is decided here by how long a fresh
 install takes.
 
 The loop for new tools: the assistant installs what it needs, appends it to the
-script in its clone, and the change comes out through the git flow of phase 3.
+script in its clone of the repo, and the change comes out through the git flow
+of phase 3. It takes effect at the next `sbx provision` or rebuild, from the
+host's copy.
 
 ### Emulator check
 
@@ -114,12 +117,16 @@ then the headless emulator steps already recorded in this repo's
 
 ## Pitfalls
 
-- **Volume device names in the guest.** The `by-id` names for attached Incus
-  volumes need to be read off a running VM before the cloud-init file is final.
+- **Disk serials under Incus.** The label script relies on Incus naming a
+  volume's serial after its device (`incus_projects`). True of the versions
+  read about, not seen on a real Incus VM. Check with `lsblk -o NAME,SERIAL` on
+  the first boot. If the serial differs, both labels stay missing, the mounts
+  are skipped, and nothing is formatted: a safe failure, visible as an empty
+  `~/projects` on the root disk.
 - **cloud-init runs once per instance.** A changed file takes effect on the
   next rebuild, not on a restart.
-- **`/home/ai/.cache` on a separate disk** is owned by root after the first
-  mount. The script has to `chown` it.
+- **Nested KVM** in an Incus VM is assumed from the host's `nested=Y`. Not
+  tested.
 
 ## Out of scope
 
@@ -129,8 +136,9 @@ then the headless emulator steps already recorded in this repo's
 
 ## Done when
 
-- `ssh ai@10.77.0.10` works from the host with the key, and password login is
-  refused.
+- `sbx ssh` works from the host with the key, and password login is refused.
+- `lsblk -o NAME,SERIAL,LABEL,MOUNTPOINT` in the guest shows the two volumes
+  labelled and mounted.
 - The phase 1 isolation test passes from inside this VM.
 - `uv`, `flutter doctor`, `blender --version` and `claude --version` all answer.
 - The emulator boots headless to `sys.boot_completed=1`.

@@ -1,0 +1,45 @@
+#cloud-config
+# The sandbox VM. Kept small on purpose: the user, the two persistent disks,
+# SSH. Everything else is in provision.sh, which is reviewed like any change.
+# __SSH_PUBKEY__ is replaced by `sbx` with the host's public key.
+users:
+  - name: ai
+    uid: 1000
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    ssh_authorized_keys:
+      - __SSH_PUBKEY__
+ssh_pwauth: false
+disable_root: true
+
+# The two volumes are mounted by filesystem label. On a first boot they are
+# blank and get labelled here; on a rebuild they already carry the label and
+# are left alone. This is a script and not cloud-init's `fs_setup` because fs_setup
+# needs device names, and those differ between VM managers.
+write_files:
+  - path: /usr/local/sbin/sbx-disks.sh
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      # Give each persistent disk its label on first use. A disk is matched
+      # by its serial, which carries the Incus device name (incus_projects,
+      # incus_caches), never by position or size. A disk that already has a
+      # filesystem is never touched, and nothing is guessed: with no match,
+      # the label is left missing and the mount is skipped.
+      set -eu
+      for label in projects caches; do
+        blkid -L "$label" >/dev/null 2>&1 && continue
+        d=$(lsblk -dn -o PATH,TYPE,SERIAL | awk -v l="$label" '$2=="disk" && $3 ~ l"$" {print $1; exit}')
+        [ -n "$d" ] || { echo "sbx-disks: no disk with serial *$label" >&2; continue; }
+        [ -z "$(lsblk -n -o FSTYPE,PARTTYPE "$d" | tr -d ' \n')" ] || { echo "sbx-disks: $d is not blank, left alone" >&2; continue; }
+        mkfs.ext4 -q -L "$label" "$d"
+      done
+runcmd:
+  - [/usr/local/sbin/sbx-disks.sh]
+  - [mkdir, -p, /home/ai/projects, /home/ai/.cache]
+  - [sh, -c, "grep -q LABEL=projects /etc/fstab || echo 'LABEL=projects /home/ai/projects ext4 defaults,nofail 0 2' >> /etc/fstab"]
+  - [sh, -c, "grep -q LABEL=caches /etc/fstab || echo 'LABEL=caches /home/ai/.cache ext4 defaults,nofail 0 2' >> /etc/fstab"]
+  - [systemctl, daemon-reload]
+  - [mount, -a]
+  - [chown, "ai:ai", /home/ai, /home/ai/projects, /home/ai/.cache]

@@ -7,9 +7,9 @@ description: |
   Covers the host setup, the guest provisioning, the git flow in and out, GPU
   passthrough, rebuilds and day-to-day maintenance.
 comment: |
-  Written from a design conversation on 2026-10-09/10. No command in this folder
-  has been run yet: every command block is the intended shape, to be checked
-  against the installed Incus version when its phase starts.
+  Written from a design conversation on 2026-10-09/10. Nothing has been run on
+  g7. Phases 1, 2, 3 and 5 were dry-run on another machine the same day, see
+  01.2_lab_run.md; phase 4 (GPU) has not been run anywhere.
 ---
 
 # AI sandbox VM
@@ -70,7 +70,8 @@ explain the shape.
 
 - **Internet only.** The VM sits on its own bridge behind the host's NAT. Host
   rules block it from the LAN, the tailnet (`100.64.0.0/10`) and the host
-  itself. Kept even under the mistakes-only threat model: repos hold configs
+  itself. Two layers do it: an Incus ACL for the private ranges, and a small
+  nftables guard for the host's own addresses, which the ACL does not cover. Kept even under the mistakes-only threat model: repos hold configs
   pointing at real homelab services, and a test run should fail to reach them.
 - **The VM is not on the tailnet** and Tailscale is not installed in it. Other
   tailnet devices reach a web app in the VM through the host.
@@ -139,6 +140,9 @@ explain the shape.
   - Recommended: a, because the VM needs a clone of `bootstrap` anyway to
     provision itself, so the assistant's additions come back through the normal
     review.
+  - Note, 2026-10-10: the lab run needed somewhere to keep what it wrote, so
+    the scripts are in `sandbox-vm/` at the root of this repo for now. That is
+    option c by accident, not a decision; moving them is a copy.
   - NEW_ANS:
 - Q2: Which Ubuntu release is on g7, and which for the guest? Incus is in the
   standard repos from 24.04; an older host needs the Zabbly repo. `lsb_release
@@ -181,4 +185,14 @@ explain the shape.
 - Q9: Guest user. A single user `ai` with passwordless sudo, reached by SSH with
   the host's public key only, password login off.
   - Recommended: yes.
+  - NEW_ANS:
+- Q10: How is the host guard loaded at boot on g7? Raised by the lab run
+  ([`01.2_lab_run.md`](01.2_lab_run.md)): the Incus ACL alone left the host
+  reachable through any address outside the private ranges, and the nftables
+  table that closes this does not survive a reboot by itself.
+  - a. A small systemd unit ordered before `incus.service` that runs
+    `nft -f host_guard.nft`.
+  - b. An include in `/etc/nftables.conf` with `nftables.service` enabled.
+  - Recommended: a, because it leaves the host's main firewall file alone and
+    ties the guard to the thing it guards.
   - NEW_ANS:

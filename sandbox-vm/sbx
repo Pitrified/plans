@@ -1,0 +1,248 @@
+#!/usr/bin/env bash
+# sbx - drive the AI sandbox from the host.
+#
+# The host reaches in; the sandbox never reaches the host. Every command here
+# runs on the host and uses either `incus` or SSH with agent forwarding off.
+#
+#   sbx up [--gpu]        start the sandbox (create it if missing)
+#   sbx down              stop it
+#   sbx ssh [cmd...]      shell, or run a command, as the sandbox user
+#   sbx ip                print its address
+#   sbx in [branch]       push the current repo's branch into the sandbox
+#   sbx out [branch]      fetch, review, fast-forward. Never pushes to GitHub.
+#   sbx carry-out         copy the login and state files out to the host
+#   sbx carry-in          copy them, and the API keys, back in
+#   sbx provision         run the provisioning script from the host's copy
+#   sbx rebuild [--force] delete and recreate; volumes and login survive
+#   sbx test [host:port...]  run the isolation test
+#
+# Configuration is by environment, optionally from $SBX_STATE/config.
+set -euo pipefail
+
+HERE=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
+SBX_STATE=${SBX_STATE:-$HOME/.local/state/sbx}
+[ -f "$SBX_STATE/config" ] && . "$SBX_STATE/config"
+
+SBX_NAME=${SBX_NAME:-sbx}
+SBX_USER=${SBX_USER:-ai}
+SBX_IP=${SBX_IP:-10.77.0.10}
+SBX_IMAGE=${SBX_IMAGE:-images:ubuntu/24.04/cloud}
+SBX_VM=${SBX_VM:-1}                       # 0 = container (lab only)
+SBX_PROFILE=${SBX_PROFILE:-sbx}
+SBX_GPU_PROFILE=${SBX_GPU_PROFILE:-sbx-gpu}
+SBX_GPU_PCI=${SBX_GPU_PCI:-0000:01:00.0}
+SBX_POOL=${SBX_POOL:-default}
+SBX_PROJECTS_VOL=${SBX_PROJECTS_VOL:-sbx-projects}
+SBX_KEY=${SBX_KEY:-$HOME/.ssh/sbx_ed25519}
+SBX_CLOUD_INIT=${SBX_CLOUD_INIT:-$HERE/guest/cloud-init.yaml}
+SBX_PROVISION=${SBX_PROVISION:-$HERE/guest/provision.sh}
+SBX_TEST_TARGETS=${SBX_TEST_TARGETS:-}     # space separated host:port that must be blocked
+
+HOME_IN=/home/$SBX_USER
+# Files carried across a rebuild, relative to the sandbox user's home.
+CARRY=(.claude/.credentials.json .claude.json)
+
+die() { echo "sbx: $*" >&2; exit 1; }
+note() { echo "sbx: $*" >&2; }
+
+ssh_opts=(-i "$SBX_KEY" -o IdentitiesOnly=yes -o ForwardAgent=no
+  -o UserKnownHostsFile="$SBX_STATE/known_hosts" -o StrictHostKeyChecking=accept-new
+  -o LogLevel=ERROR)
+export GIT_SSH_COMMAND="ssh ${ssh_opts[*]}"
+
+state_dir() { mkdir -p "$SBX_STATE"; chmod 700 "$SBX_STATE"; }
+exists() { incus info "$SBX_NAME" >/dev/null 2>&1; }
+running() { [ "$(incus list "^${SBX_NAME}\$" -c s -f csv 2>/dev/null)" = RUNNING ]; }
+guest() { incus exec "$SBX_NAME" --user 1000 --group 1000 --cwd "$HOME_IN" \
+  --env HOME="$HOME_IN" --env USER="$SBX_USER" -- "$@"; }
+remote_url() { echo "$SBX_USER@$SBX_IP:projects/$1"; }
+
+wait_ssh() {
+  local i
+  for i in $(seq 1 60); do
+    ssh "${ssh_opts[@]}" -o ConnectTimeout=3 "$SBX_USER@$SBX_IP" true 2>/dev/null && return 0
+    sleep 2
+  done
+  die "no SSH on $SBX_IP after 2 minutes"
+}
+
+create() {
+  [ -f "$SBX_KEY.pub" ] || die "no key at $SBX_KEY.pub (ssh-keygen -t ed25519 -f $SBX_KEY)"
+  [ -f "$SBX_CLOUD_INIT" ] || die "no cloud-init file at $SBX_CLOUD_INIT"
+  local ud vm=()
+  ud=$(sed "s|__SSH_PUBKEY__|$(cat "$SBX_KEY.pub")|" "$SBX_CLOUD_INIT")
+  [ "$SBX_VM" = 1 ] && vm=(--vm)
+  incus init "$SBX_IMAGE" "$SBX_NAME" "${vm[@]}" -p "$SBX_PROFILE" \
+    --config cloud-init.user-data="$ud" </dev/null
+}
+
+cmd_up() {
+  local gpu=0; [ "${1:-}" = --gpu ] && gpu=1
+  state_dir
+  exists || create
+  if running; then note "already running"; return 0; fi
+  if [ "$gpu" = 1 ]; then
+    local drv; drv=$(basename "$(readlink -f "/sys/bus/pci/devices/$SBX_GPU_PCI/driver" 2>/dev/null)" 2>/dev/null || true)
+    [ "$drv" = vfio-pci ] || [ -z "$drv" ] ||
+      die "$SBX_GPU_PCI is bound to '$drv' on the host. Boot the host headless first."
+    incus profile add "$SBX_NAME" "$SBX_GPU_PROFILE" 2>/dev/null || true
+  else
+    incus profile remove "$SBX_NAME" "$SBX_GPU_PROFILE" 2>/dev/null || true
+  fi
+  incus start "$SBX_NAME" </dev/null
+  timeout 600 incus exec "$SBX_NAME" -- cloud-init status --wait >/dev/null 2>&1 || true
+  wait_ssh
+  note "up at $SBX_IP"
+}
+
+cmd_down() { incus stop "$SBX_NAME" </dev/null; }
+cmd_ip() { echo "$SBX_IP"; }
+cmd_ssh() {
+  if [ $# -eq 0 ]; then exec ssh "${ssh_opts[@]}" -t "$SBX_USER@$SBX_IP"
+  else exec ssh "${ssh_opts[@]}" "$SBX_USER@$SBX_IP" "$@"; fi
+}
+
+repo_ctx() {
+  top=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
+  proj=$(basename "$top")
+  branch=${1:-$(git -C "$top" symbolic-ref --short HEAD 2>/dev/null)} || die "detached HEAD: name a branch"
+}
+
+cmd_in() {
+  local top proj branch; repo_ctx "${1:-}"
+  state_dir
+  git -C "$top" remote get-url sandbox >/dev/null 2>&1 ||
+    git -C "$top" remote add sandbox "$(remote_url "$proj")"
+  # Remember where this project lives on the host, for the rebuild check.
+  touch "$SBX_STATE/projects"
+  grep -qxF "$proj $top" "$SBX_STATE/projects" || echo "$proj $top" >> "$SBX_STATE/projects"
+  ssh "${ssh_opts[@]}" "$SBX_USER@$SBX_IP" \
+    "test -d projects/$proj/.git || git init -q -b '$branch' projects/$proj"
+  if ! git -C "$top" push sandbox "$branch"; then
+    die "push refused. The usual cause is uncommitted changes in the sandbox copy: commit or stash there, then retry."
+  fi
+}
+
+cmd_out() {
+  local top proj branch; repo_ctx "${1:-}"
+  git -C "$top" fetch --prune sandbox
+  local ref="sandbox/$branch" sha
+  sha=$(git -C "$top" rev-parse --verify -q "$ref") || die "the sandbox has no branch '$branch'"
+  # Other branches the sandbox has that the host does not fully hold.
+  local r
+  while read -r r; do
+    [ "$r" = "$ref" ] && continue
+    [ -n "$(git -C "$top" branch --contains "$r" 2>/dev/null)" ] ||
+      note "also in the sandbox, not on the host: ${r#sandbox/}"
+  done < <(git -C "$top" for-each-ref --format='%(refname:short)' refs/remotes/sandbox)
+
+  local base; base=$(git -C "$top" rev-parse --verify -q "refs/heads/$branch" || true)
+  if [ -n "$base" ]; then
+    [ "$base" = "$sha" ] && { note "$branch: nothing new"; return 0; }
+    git -C "$top" merge-base --is-ancestor "$base" "$sha" ||
+      die "$branch has diverged between host and sandbox. Resolve by hand."
+    if [ -t 1 ]; then git -C "$top" log -p "$base..$sha"
+    else git -C "$top" --no-pager log --stat "$base..$sha"; fi
+  else
+    note "$branch is new on the host"
+    git -C "$top" --no-pager log --stat "$sha"
+  fi
+
+  if [ "${SBX_YES:-0}" != 1 ]; then
+    read -r -p "take these commits into $branch? [y/N] " a </dev/tty
+    [ "$a" = y ] || die "left as is. The commits stay available as $ref."
+  fi
+  # Take exactly the commit that was shown, not whatever the sandbox has now.
+  if [ "$(git -C "$top" symbolic-ref --short -q HEAD)" = "$branch" ]; then
+    git -C "$top" merge --ff-only "$sha"
+  else
+    git -C "$top" fetch . "$sha:refs/heads/$branch"
+  fi
+  note "$branch updated on the host. Publishing is a separate 'git push'."
+}
+
+cmd_carry_out() {
+  state_dir; mkdir -p "$SBX_STATE/carry"; chmod 700 "$SBX_STATE/carry"
+  local f
+  for f in "${CARRY[@]}"; do
+    if incus file pull "$SBX_NAME$HOME_IN/$f" "$SBX_STATE/carry/$(basename "$f")" 2>/dev/null; then
+      chmod 600 "$SBX_STATE/carry/$(basename "$f")"; note "carried out $f"
+    else note "not present in the sandbox, skipped: $f"; fi
+  done
+}
+
+cmd_carry_in() {
+  local f src
+  for f in "${CARRY[@]}"; do
+    src="$SBX_STATE/carry/$(basename "$f")"
+    [ -f "$src" ] || { note "nothing to carry in for $f"; continue; }
+    incus file push --create-dirs --uid 1000 --gid 1000 --mode 600 "$src" "$SBX_NAME$HOME_IN/$f"
+    note "carried in $f"
+  done
+  # --create-dirs leaves the parents owned by root.
+  incus exec "$SBX_NAME" -- sh -c "for d in .claude .config; do [ -d $HOME_IN/\$d ] && chown 1000:1000 $HOME_IN/\$d; done; true"
+  if [ -f "$SBX_STATE/sbx.env" ]; then
+    incus file push --create-dirs --uid 1000 --gid 1000 --mode 600 \
+      "$SBX_STATE/sbx.env" "$SBX_NAME$HOME_IN/.config/sbx.env"
+    incus exec "$SBX_NAME" -- chown 1000:1000 "$HOME_IN/.config"
+    note "carried in sbx.env"
+  fi
+}
+
+cmd_provision() {
+  [ -f "$SBX_PROVISION" ] || die "no provisioning script at $SBX_PROVISION"
+  incus file push --uid 1000 --gid 1000 --mode 755 "$SBX_PROVISION" "$SBX_NAME/tmp/provision.sh"
+  guest env SBX_FLAVOUR="${SBX_FLAVOUR:-full}" bash /tmp/provision.sh
+}
+
+unfetched() {
+  # Print every sandbox branch whose tip is on no host branch. Uses the
+  # registry written by `sbx in`.
+  [ -f "$SBX_STATE/projects" ] || return 0
+  local proj top r
+  while read -r proj top; do
+    [ -d "$top/.git" ] || { echo "$proj: host repo missing at $top"; continue; }
+    git -C "$top" fetch --prune sandbox >/dev/null 2>&1 || { echo "$proj: cannot fetch from the sandbox"; continue; }
+    while read -r r; do
+      [ -n "$(git -C "$top" branch --contains "$r" 2>/dev/null)" ] || echo "$proj: ${r#sandbox/} has commits the host does not hold"
+    done < <(git -C "$top" for-each-ref --format='%(refname:short)' refs/remotes/sandbox)
+  done < "$SBX_STATE/projects"
+}
+
+cmd_rebuild() {
+  local force=0; [ "${1:-}" = --force ] && force=1
+  state_dir
+  if exists; then
+    running || incus start "$SBX_NAME" </dev/null
+    wait_ssh
+    local left; left=$(unfetched)
+    if [ -n "$left" ]; then
+      echo "$left" >&2
+      [ "$force" = 1 ] || die "unfetched work in the sandbox. 'sbx out' it, or rebuild --force (the projects volume is kept either way)."
+    fi
+    cmd_carry_out
+    incus storage volume snapshot create "$SBX_POOL" "$SBX_PROJECTS_VOL" \
+      "pre-rebuild-$(date +%Y%m%d-%H%M%S)" </dev/null
+    incus delete -f "$SBX_NAME" </dev/null
+  fi
+  rm -f "$SBX_STATE/known_hosts"          # the new instance has new host keys
+  cmd_up
+  cmd_provision
+  cmd_carry_in
+  cmd_test
+  note "rebuilt"
+}
+
+cmd_test() {
+  # shellcheck disable=SC2086
+  "$HERE/host/isolation_test.sh" "$SBX_NAME" "$@" $SBX_TEST_TARGETS
+}
+
+c=${1:-}; [ $# -gt 0 ] && shift
+case "$c" in
+  up) cmd_up "$@" ;; down) cmd_down ;; ssh) cmd_ssh "$@" ;; ip) cmd_ip ;;
+  in) cmd_in "$@" ;; out) cmd_out "$@" ;;
+  carry-out) cmd_carry_out ;; carry-in) cmd_carry_in ;;
+  provision) cmd_provision ;; rebuild) cmd_rebuild "$@" ;; test) cmd_test "$@" ;;
+  *) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac
