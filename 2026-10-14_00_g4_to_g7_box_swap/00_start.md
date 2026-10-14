@@ -112,7 +112,8 @@ Rollback stays cheap until phase 6: G4's copy of the JSON and its stopped Gramps
   So every unpushed branch and dirty file on G4 must be pushed in phase 2, or it does not reach G7.
 - **GitHub on G7 through agent forwarding from G4** (Q12). The key never leaves G4; G7 can clone, pull and push only while an `ssh -A` session from G4 is open.
   Consequences: G7 remotes use ssh URLs; unattended work on G7 (Remote Control sessions, timers) cannot reach private repos or push, which matches the box rule.
-  Risk: while a forwarded session is open, root on G7 can use the agent. Mitigations: forward per session with `-A`, never `ForwardAgent yes` in config; load the key with `ssh-add -c` so each use asks for confirmation on G4.
+  Risk: while a forwarded session is open, root on G7 can use the agent. Mitigations: forward per session with `-A`, never `ForwardAgent yes` in config; load the key with a lifetime, `ssh-add -t 1h`.
+  The confirm constraint (`ssh-add -c`) was tried and dropped (Q16). A fine-grained PAT on G7 is an accepted fallback if forwarding gets tedious; the box rule would then change with it.
   To verify in phase 3: agent forwarding works through Tailscale SSH on G7.
 - **Claude memory lives in the repos, not in `~/.claude`** (Q13). Nothing to move today; the rule applies from now on.
 - **The plans repo is on GitHub and public** (Q10). Nothing secret-adjacent goes in this folder: no tokens, no IPs, no Gramps tree IDs, no network names.
@@ -168,6 +169,7 @@ Lost with G7, to recreate on G4 in phase 6:
   - b. Keep it, and add a Tailscale ACL so only your personal devices (not G7) may connect to G4.
   - Recommended: a, unless you need to reach G4 remotely; then b.
   - ANS: a.
+    Refined by Q16: G4 stays reachable through openssh-server instead of Tailscale SSH.
 - Q9: The IPv6 DNS workaround (`2026-08-23_00`) is still applied on G4's wired link. Carry it to G7?
   - a. No, start with stock DHCP DNS on G7 and reapply the note only if the IPv4 outage returns.
   - b. Yes, apply on day one.
@@ -210,3 +212,10 @@ Lost with G7, to recreate on G4 in phase 6:
   - b. Install it on G7 like G4.
   - Recommended: a, because a listening daemon nobody uses is attack surface with no benefit.
   - ANS: a.
+- Q16: Key confirmation and remote access to G4 (raised in phase 2, reopens parts of Q8 and Q12).
+  `ssh-add -c` cannot work on G4: OpenSSH's agent confirms through `/usr/bin/ssh-askpass`, which is not installed, and GNOME's `gcr-ssh-askpass` only serves passphrase prompts. A dialog would also need someone at G4's screen, and G4 is mostly used remotely.
+  Separately, G4 has no openssh-server, so Q8a (Tailscale SSH off) would leave G4 unreachable remotely. The old G7 had openssh-server and asked for a password over Tailscale.
+  - a. Drop `-c`; load the key with `ssh-add -t 1h` when needed. On G4: install openssh-server, allow port 22 on `tailscale0` only in UFW, then `tailscale set --ssh=false`.
+  - b. Install `ssh-askpass-gnome` to make `-c` work, keep Tailscale SSH on G4.
+  - Recommended: a, because it matches how G4 is used and how the old G7 was reached.
+  - ANS: a. The user reaches G4 remotely only sometimes, with a password over Tailscale like the old G7; G7 itself is used remotely almost always, where a short `-A` or a PAT is fine.

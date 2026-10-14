@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in progress
 ---
 
 # Phase 2 - Make G4 the trusted machine
@@ -19,8 +19,10 @@ Context: [`00_start.md`](00_start.md) Q4, Q5, Q8. Depends on [`01_prepare.md`](0
 ## Plan
 
 - GitHub (user, in a G4 terminal):
-  `ssh-keygen -t ed25519 -C "pmn@g4"` with a passphrase; register in GitHub as an authentication key; `ssh -T git@github.com`.
-  `ssh-add -c` for the key, so agent-forwarded use from G7 asks for confirmation on G4 (Q12).
+  `ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_github` with a passphrase; register in GitHub as an authentication key.
+  `~/.ssh/config`: `Host github.com` with that `IdentityFile` and `IdentitiesOnly yes`.
+  GitHub host key into `known_hosts` from `api.github.com/meta` (fetched over TLS), not by accepting the first-connection prompt.
+  Load the key when needed with `ssh-add -t 1h ~/.ssh/id_ed25519_github` (Q16); `ssh -T git@github.com` greets the user.
   Switch remotes to ssh on G4 (`git remote set-url`), every repo plus `~/dotfiles`, `~/bootstrap`.
 - Push unpushed work: `genealogy-gramps-fn` main, `epub-fixer`, `klide`, `pose-tools`, `house-renderer` (ahead branches, the 7 local-only branches, 3 dirty files), `flutter-setup-project` local-only branches, `plans`, `~/bootstrap`.
   For each local-only branch: push, or write it down as dropped.

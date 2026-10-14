@@ -24,7 +24,10 @@ Context: [`00_start.md`](00_start.md) Q3, Q8, Q11. Depends on [`05_cutover.md`](
   Create `.admin.env` with reissued values: R2 token with delete rights, Cloudflare Access token, Gramps admin credential, repository password.
   Keep `/srv/gramps-web` on G4 for 14 days after the first verified G7 backup, then delete it (Q11). Log the deletion date.
 - `rm ~/.claude/rules/local-box.md` on G4 (the box rule no longer describes it).
-- Tailscale on G4: `tailscale set --ssh=false` (Q8).
+- Remote access to G4 (Q8, Q16). While Tailscale SSH is on it answers port 22 on the tailnet address itself, so openssh-server cannot be tested from another device until it is off, and turning it off may drop Tailscale SSH sessions:
+  install openssh-server; `ufw allow in on tailscale0 to any port 22 proto tcp`; check `ssh pmn@localhost` on G4 asks for the password;
+  then, from a session that does not ride on Tailscale SSH (VS Code Remote-SSH counts as one that does) or at the machine, `tailscale set --ssh=false`; check `ssh pmn@pmn-14g4` from another device. Revert: `tailscale set --ssh`.
+  sshd settings from `01_box_setup.md` phase 1 except `PasswordAuthentication`, which stays on (port 22 is reachable from the tailnet only).
 - Optional: revert G4's always-on lid setting (`always-on-server.md` Reverting section), drop linger.
 - GitHub: revoke the fine-grained PAT that lived on G7.
 - Docs in `linux-box-cloudflare`: any gap found in phases 3 to 5; which host is the box. Gramps `docs/admin-machine.md` if it names a host.
@@ -32,6 +35,6 @@ Context: [`00_start.md`](00_start.md) Q3, Q8, Q11. Depends on [`05_cutover.md`](
 
 ## Done when
 
-- On G4: no `/etc/cloudflared/*.json`; no listener on 8090, 8091, 8092; `docker ps -a` empty; `tailscale debug prefs` shows `RunSSH: false`.
+- On G4: no `/etc/cloudflared/*.json`; no listener on 8090, 8091, 8092; `docker ps -a` empty; `tailscale debug prefs` shows `RunSSH: false`; ssh to G4 over Tailscale reaches openssh-server.
 - In `genealogy-gramps-fn`: `make ps` refuses on G4 and works on G7; an admin target is accepted on G4.
 - The site still serves from G7 with G4 powered off.

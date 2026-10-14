@@ -10,7 +10,8 @@ Analysis, inventory and open questions in [`00_start.md`](00_start.md).
 - Same tunnel: the JSON moves from G4 to G7 at cutover, no DNS change; never two connectors running at once; G4's copy deleted in phase 6.
 - Fresh clones on G7 plus a curated copy of gitignored data, so everything unpushed must be pushed from G4 first.
 - G7 was wiped before the plan; lost trusted material is reissued, not recovered.
-- GitHub key on G4 only; G7 reaches GitHub through `ssh -A` from G4, with `ssh-add -c` confirmation.
+- GitHub key on G4 only; G7 reaches GitHub through `ssh -A` from G4, key loaded with `ssh-add -t 1h`; a PAT on G7 is the accepted fallback.
+- G4 is reached remotely through openssh-server on the tailnet only; Tailscale SSH off on G4.
 - Claude memory goes into the repos, not `~/.claude`.
 - Cloudflare `cert.pem` lives on G4 only, created when next needed.
 - This folder is public on GitHub: nothing secret-adjacent in it.
@@ -21,7 +22,7 @@ Analysis, inventory and open questions in [`00_start.md`](00_start.md).
 | #  | Phase                              | Plan                                                       | Status  |
 | -- | ---------------------------------- | ---------------------------------------------------------- | ------- |
 | 1  | Prepare and close inventory gaps   | [`01_prepare.md`](01_prepare.md)                           | done    |
-| 2  | Make G4 the trusted machine        | [`02_g4_trusted.md`](02_g4_trusted.md)                     | draft   |
+| 2  | Make G4 the trusted machine        | [`02_g4_trusted.md`](02_g4_trusted.md)                     | in progress |
 | 3  | Install G7 as the box              | [`03_g7_install.md`](03_g7_install.md)                     | draft   |
 | 4  | Stage G7                           | [`04_stage_on_g7.md`](04_stage_on_g7.md)                   | draft   |
 | 5  | Cutover                            | [`05_cutover.md`](05_cutover.md)                           | draft   |
@@ -39,3 +40,5 @@ Append-only. Newest at the bottom.
 - 2026-10-14 : phase 1 started. Reviewed the plan (no corrections; filtered the Tailscale prefs read so no key material reaches a log). Took the G4 snapshot into `~/saved_state_g4/`. Read UFW and Tailscale state via handoff. Found fail2ban and the usb-storage block missing despite the doc, and an enabled iperf3 server: raised Q14, Q15. Waiting on the Cloudflare dashboard check.
 - 2026-10-14 : folded Q14 (skip fail2ban and the usb-storage block on G7, fix the doc) and Q15 (no iperf3 on G7) into phase 3. Replaced the manual dashboard check with a read-only API dump script (`~/handoff-logs/g4_to_g7/cf_dump.sh` on G4, output stays local because Access policies hold email addresses).
 - 2026-10-14 : phase 1 done. Cloudflare dump: HSTS on without preload, Full (strict), TLS 1.2, three proxied CNAMEs to the one healthy tunnel (named `pmn-14g4`), and an Access application for each of apex, wildcard and `family`. Nothing in the zone needs changing for the swap. Closing review: no corrections; phase 5 already has no HSTS step since the tunnel is kept.
+- 2026-10-14 : phase 2 started. Review: the agent is `gcr-ssh-agent` with its own askpass, so `ssh-add -c` should work; added a check that the confirm dialog appears and that denying it fails, a dedicated key path so the agent cannot auto-load it unconstrained, and GitHub host keys from `api.github.com/meta`.
+- 2026-10-14 : phase 2, GitHub key created and registered. `ssh-add -c` failed: no `/usr/bin/ssh-askpass` for OpenSSH's agent, and the GNOME agent had no display variables. Dropped the confirm constraint for `ssh-add -t 1h` (Q16). Also found G4 has no openssh-server, so Q8a would cut remote access: phase 6 now installs openssh-server on the tailnet only before turning Tailscale SSH off.

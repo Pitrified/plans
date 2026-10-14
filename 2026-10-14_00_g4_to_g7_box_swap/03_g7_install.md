@@ -30,8 +30,8 @@ Context: [`00_start.md`](00_start.md) Q1, Q7, Q9. Depends on [`01_prepare.md`](0
 - Toolchains per Q7, each from its note: Flutter + Android (`2026-07-07_00`), PATH fix (`2026-09-24_00`), emulator and kvm ACL (`2026-09-25_00`), calibre (`2026-08-11_00`), Playwright (`2026-09-17_00`).
 - `~/dotfiles` and `~/bootstrap` cloned over https (public, no credentials needed) and linked as on G4.
 - `bash scripts/setup-disposable-box.sh` after `~/repos/linux-box-cloudflare` lands (phase 4), so the box rule loads on G7.
-- GitHub via agent forwarding (Q12): from G4, `ssh -A pmn@pmn-g7` then `ssh -T git@github.com` on G7 greets the user, and a confirmation prompt appears on G4 (`ssh-add -c`).
-  Add GitHub's host key to G7's `known_hosts`. No key, PAT or credential helper on G7.
+- GitHub via agent forwarding (Q12): from G4, `ssh -A pmn@pmn-g7` then `ssh -T git@github.com` on G7 greets the user (key loaded on G4 with `ssh-add -t 1h`).
+  Add GitHub's host key to G7's `known_hosts`. No key or credential helper on G7; a fine-grained PAT only if forwarding gets tedious (Q16).
 - Claude Code: install, log in, check Remote Control in one repo (the GitHub App gate in `2026-07-17_00` is account-level, should already pass).
 - Each deviation from the docs: commit a doc fix in `linux-box-cloudflare` (from G4, or from G7 in an `ssh -A` session).
 
