@@ -20,6 +20,7 @@ Context: [`00_start.md`](00_start.md) Q4, Q12. Depends on [`02_g4_trusted.md`](0
 
 ## Plan
 
+- Gate before cloning: rerun the dirty/ahead scan on G4. The `house-renderer` bagno 5 files left uncommitted in phase 2 must be pushed by then, or they stay on G4 only.
 - Clones on G7, in an `ssh -A` session from G4: `linux-box-cloudflare` first, then `REPOMGR_CONFIG` and `repomgr clone-missing`.
   Check that repomgr clones with ssh URLs (or plain `git clone git@github.com:...` where it does not); private repos included.
   Branches: check out the branch each repo is on today on G4 (`abyss`, `lang-tools`, `snap_fit` are not on main).

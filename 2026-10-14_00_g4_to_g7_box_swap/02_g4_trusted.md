@@ -1,5 +1,5 @@
 ---
-status: in progress
+status: done
 ---
 
 # Phase 2 - Make G4 the trusted machine
@@ -41,3 +41,18 @@ Context: [`00_start.md`](00_start.md) Q4, Q5, Q8. Depends on [`01_prepare.md`](0
 
 - `ssh -T git@github.com` greets the user from G4.
 - The unpushed scan is empty or every leftover is a written decision.
+
+## What the implementation found
+
+- Key at `~/.ssh/id_ed25519_github`, registered as an authentication key; `~/.ssh/config` pins it for `github.com`; host keys from `api.github.com/meta`.
+- `ssh-add -c` could not work (no `/usr/bin/ssh-askpass`, and the GNOME agent started without display variables). Replaced by `ssh-add -t 1h` (`00_start.md` Q16).
+  The GNOME agent lists every key in `~/.ssh` as available even when not loaded, so `ssh-add -l` showing the key does not mean it is usable.
+- Remotes switched to ssh in all 41 repos plus `~/dotfiles` and `~/bootstrap` (two already were).
+- Pushed 12 fast-forwards: `genealogy-gramps-fn` main, `house-renderer` main and 5 feature branches, `klide` main, `epub-fixer` effort-07, `pose-tools` face-landmarker, `plans`, `bootstrap`.
+- The 10 local-only branches (3 `flutter-setup-project`, 7 `house-renderer`) are all merged into `origin/main` with no unique commits: dropped, nothing lost.
+- Leftovers, accepted:
+  `house-renderer` has 3 uncommitted files on `main` (bagno 5 work from 2026-10-14), left to the session working on it; phase 4 checks it again before cloning.
+  `~/repos/va` (only a `.claude/` folder) is dust, not copied.
+  Some branches are behind GitHub (pushed from the old G7); irrelevant for fresh clones.
+- `local-box.md` rule updated and pushed in `linux-box-cloudflare`.
+- Browser logins on G4 are done as needed, not as a step.

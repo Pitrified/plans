@@ -22,7 +22,7 @@ Analysis, inventory and open questions in [`00_start.md`](00_start.md).
 | #  | Phase                              | Plan                                                       | Status  |
 | -- | ---------------------------------- | ---------------------------------------------------------- | ------- |
 | 1  | Prepare and close inventory gaps   | [`01_prepare.md`](01_prepare.md)                           | done    |
-| 2  | Make G4 the trusted machine        | [`02_g4_trusted.md`](02_g4_trusted.md)                     | in progress |
+| 2  | Make G4 the trusted machine        | [`02_g4_trusted.md`](02_g4_trusted.md)                     | done    |
 | 3  | Install G7 as the box              | [`03_g7_install.md`](03_g7_install.md)                     | draft   |
 | 4  | Stage G7                           | [`04_stage_on_g7.md`](04_stage_on_g7.md)                   | draft   |
 | 5  | Cutover                            | [`05_cutover.md`](05_cutover.md)                           | draft   |
@@ -42,3 +42,4 @@ Append-only. Newest at the bottom.
 - 2026-10-14 : phase 1 done. Cloudflare dump: HSTS on without preload, Full (strict), TLS 1.2, three proxied CNAMEs to the one healthy tunnel (named `pmn-14g4`), and an Access application for each of apex, wildcard and `family`. Nothing in the zone needs changing for the swap. Closing review: no corrections; phase 5 already has no HSTS step since the tunnel is kept.
 - 2026-10-14 : phase 2 started. Review: the agent is `gcr-ssh-agent` with its own askpass, so `ssh-add -c` should work; added a check that the confirm dialog appears and that denying it fails, a dedicated key path so the agent cannot auto-load it unconstrained, and GitHub host keys from `api.github.com/meta`.
 - 2026-10-14 : phase 2, GitHub key created and registered. `ssh-add -c` failed: no `/usr/bin/ssh-askpass` for OpenSSH's agent, and the GNOME agent had no display variables. Dropped the confirm constraint for `ssh-add -t 1h` (Q16). Also found G4 has no openssh-server, so Q8a would cut remote access: phase 6 now installs openssh-server on the tailnet only before turning Tailscale SSH off.
+- 2026-10-14 : phase 2 done. `ssh-add -t 1h` key works from G4 and from Claude sessions sharing the agent. Remotes to ssh everywhere, 12 branches pushed, 10 merged local-only branches dropped, `va` dropped, house-renderer dirty files left to their session. Box rule updated in `linux-box-cloudflare` (84ad86e). Closing review: phase 4 needed a gate for the house-renderer files, added.
