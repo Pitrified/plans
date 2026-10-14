@@ -31,6 +31,9 @@ Context: [`00_start.md`](00_start.md) Q3, Q8, Q11. Depends on [`05_cutover.md`](
 - Optional: revert G4's always-on lid setting (`always-on-server.md` Reverting section), drop linger.
 - GitHub: revoke the fine-grained PAT that lived on G7.
 - Docs in `linux-box-cloudflare`: any gap found in phases 3 to 5; which host is the box. Gramps `docs/admin-machine.md` if it names a host.
+- `genealogy-gramps-fn`: consider a fixed `--host` for `restic backup` in `backup_run.sh`, so snapshots stay one series across box swaps (phase 5 finding).
+- Delete `/srv/gramps-web.rehearsal` on G7.
+- Lid-closed reboot test of G7, if still open.
 - Final log line in `tracking.md`; folder status to `done`.
 
 ## Done when
