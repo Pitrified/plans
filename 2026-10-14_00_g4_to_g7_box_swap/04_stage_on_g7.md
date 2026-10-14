@@ -1,5 +1,5 @@
 ---
-status: draft
+status: done
 ---
 
 # Phase 4 - Stage G7
@@ -50,3 +50,20 @@ Context: [`00_start.md`](00_start.md) Q4, Q12. Depends on [`02_g4_trusted.md`](0
 
 - The three backends answer on G7 loopback; Gramps lists the tree and a known user can log in through an SSH port forward from G4.
 - G4 is still serving all three hostnames, unchanged.
+
+## What the implementation found
+
+- Gate: `house-renderer` bagno 5 work committed by its session and pushed by the user before cloning; `plans` dirty only with this phase's edits.
+- Clones: all 41 repos on G7 through `ssh -A` from the G4 Claude session, via `repomgr clone-missing`.
+  `klide` was missing from `repos.toml` (added). repomgr takes `--config` after the command name, or `REPOMGR_CONFIG`; the `repos.toml` usage comment showed it before the command (fixed).
+  `abyss`, `lang-tools`, `snap_fit` checked out on their G4 branches. `lang-tools` `main` shows 6 CSVs modified on a fresh clone (`data/**` is LFS in `.gitattributes`, those files are plain blobs on `main`); left as is, the working branch is clean.
+- `~/.local/bin` was not on PATH in non-interactive shells (`uv` not found over ssh): PATH block added above the interactivity guard in `~/.bashrc` on G4 and G7. `install_basics.sh` in bootstrap still only adds it to `~/.bash_aliases.local`.
+- Home data (about 280 MB) and the curated gitignored repo data (154 paths, about 400 MB, no `house-renderer/renders/`) copied with rsync. Four `pose-tools` folders holding only `__pycache__` dropped from the list. The Cloudflare JSON dump stayed on G4.
+  rsync ran without `-H`, so a uv venv in `~/ephem` grew from 65 to 89 MB on G7 (hard links became copies). Harmless.
+- G7 lacked the global git ignore (`~/.config/git/ignore`, one rule for `.claude/settings.local.json`), so three repos showed `.claude/` untracked. Now tracked in dotfiles and linked on both hosts.
+- `deploy-configs.sh` did not enable the `hub` nginx site on a fresh box (it had been linked by hand on G4); fixed. `cloudflared tunnel ingress validate` passes without the credentials JSON (it checks syntax only).
+- `make` and the compilers were missing on G7: G4 has `build-essential` as an automatic dependency (likely of the skipped `python3-pip`). Installed on G7.
+- G7 runs on a phone hotspot for now; two large downloads (Android SDK, the Gramps image) hit `connection reset` and needed retries. The box is meant to work on whatever connection it has.
+- Gramps rehearsal: `/srv/gramps-web` tarred on G4 while running, extracted as root on G7 (ownership matches G4: top folders `pmn`, container-written files root). `make up` healthy; users 6, persons 43, families 16 on both hosts. Backup timer not enabled on G7.
+- cc-kb: `make build-site` in controcanto on G7, served on 8091. Playwright Chromium 153 and Firefox 155 launch on G7.
+- Login test through a port forward skipped at the user's call: closed on the matching counts (6 users, 43 persons, 16 families), with 43 persons confirmed by the user.

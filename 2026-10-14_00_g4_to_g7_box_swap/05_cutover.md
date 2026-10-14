@@ -22,7 +22,10 @@ Context: [`00_start.md`](00_start.md) Q2, Q11. Depends on [`04_stage_on_g7.md`](
 - Before anything else: with G7 in its final place, closed lid, on AC, reboot it and check it comes back on the tailnet (carried over from phase 3).
 - On G4: `systemctl --user disable --now gramps-backup.timer`; `make down` in `genealogy-gramps-fn`; `sudo systemctl disable --now cloudflared`.
   The site is down from here.
+- On G7: `make down` in `genealogy-gramps-fn`, so the rehearsal stack does not hold the files being replaced.
 - Copy `/srv/gramps-web` G4 to G7 as root, preserving ownership (sudo tar, scp, sudo untar after moving the rehearsal copy aside). Compare file counts and a checksum of `db/`.
+  Same route as the phase 4 rehearsal: tar into `~` on G4 and chown it, rsync to G7, extract with `tar -C /srv` as root, delete both archives.
+  Then compare the Gramps counts on both hosts, as in phase 4.
 - Copy `/etc/cloudflared/<UUID>.json` G4 to G7 the same way, then on G7 `install -o root -g root -m 600` into `/etc/cloudflared/`. The transfer copy is deleted on both sides right after.
 - On G7: `make up`; `cloudflared tunnel ingress validate`; `sudo cloudflared service install` (if not done) and `systemctl enable --now cloudflared`.
   `cloudflared tunnel info` from G4 is not available without `cert.pem`; check `journalctl -u cloudflared` on G7 for registered connections instead.
