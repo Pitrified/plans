@@ -22,7 +22,9 @@ Context: [`00_start.md`](00_start.md) Q1, Q7, Q9. Depends on [`01_prepare.md`](0
 - Install Ubuntu 26.04 (user, at the machine). Same username `pmn`, so paths in units and configs carry over.
 - Network: stock DHCP DNS, no IPv6 DNS workaround (Q9); reapply `2026-08-23_00` only if the IPv4 outage returns.
 - Tailscale: remove the old `pmn-g7` node from the admin console first, then `tailscale up --ssh` and name it `pmn-g7`.
-- `01_box_setup.md` phase 1: apt upgrade, unattended-upgrades verified, `pro attach` (esm-apps, esm-infra, livepatch), UFW default deny, fail2ban, sysctl hardening, usb-storage block. Use the values found live on G4 in phase 1, not only the doc.
+- `01_box_setup.md` phase 1: apt upgrade, unattended-upgrades verified, `pro attach` (esm-apps, esm-infra, livepatch), UFW default deny with no rules, sysctl hardening. Use the values found live on G4 in phase 1, not only the doc.
+  No fail2ban and no usb-storage block (Q14): change `01_box_setup.md` to make fail2ban conditional on openssh-server and the usb-storage block optional.
+- Packages: install from `~/saved_state_g4/apt.txt`, minus `iperf3` (Q15) and the hardware/meta packages the installer already provides.
 - `bash scripts/setup-always-on.sh`; `loginctl enable-linger pmn`.
 - apt: git, git-lfs, nginx, cloudflared (apt repo, `noble` fallback), docker.io, docker-compose-v2, restic, `pmn` into `docker` group, uv per its install route on G4.
 - Toolchains per Q7, each from its note: Flutter + Android (`2026-07-07_00`), PATH fix (`2026-09-24_00`), emulator and kvm ACL (`2026-09-25_00`), calibre (`2026-08-11_00`), Playwright (`2026-09-17_00`).
@@ -41,6 +43,6 @@ Context: [`00_start.md`](00_start.md) Q1, Q7, Q9. Depends on [`01_prepare.md`](0
 ## Done when
 
 - From G4: `ssh pmn@pmn-g7` works over Tailscale; it still works after a lid-closed reboot of G7 on AC.
-- `ufw status`, `fail2ban-client status sshd`, `pro status`, `systemctl is-active unattended-upgrades` match G4's phase 1 log.
+- `ufw status`, `pro status`, `systemctl is-active unattended-upgrades` match G4's phase 1 log.
 - Agent-forwarded `ssh -T git@github.com` works on G7, and fails from a session without `-A`.
 - `flutter doctor`, `docker run --rm hello-world`, `restic version`, `cloudflared --version` pass on G7.

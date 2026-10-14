@@ -20,7 +20,7 @@ Analysis, inventory and open questions in [`00_start.md`](00_start.md).
 
 | #  | Phase                              | Plan                                                       | Status  |
 | -- | ---------------------------------- | ---------------------------------------------------------- | ------- |
-| 1  | Prepare and close inventory gaps   | [`01_prepare.md`](01_prepare.md)                           | draft   |
+| 1  | Prepare and close inventory gaps   | [`01_prepare.md`](01_prepare.md)                           | done    |
 | 2  | Make G4 the trusted machine        | [`02_g4_trusted.md`](02_g4_trusted.md)                     | draft   |
 | 3  | Install G7 as the box              | [`03_g7_install.md`](03_g7_install.md)                     | draft   |
 | 4  | Stage G7                           | [`04_stage_on_g7.md`](04_stage_on_g7.md)                   | draft   |
@@ -36,3 +36,6 @@ Append-only. Newest at the bottom.
 - 2026-10-14 : bootstrapped the plan folder from a read-only inventory of G4 (services, timers, docker, /srv, ~/cred layout, repo dirty/unpushed state, gitignored data, untracked /etc state). Learned that `~/saved_state` is the snapshot of G7's current install. Raised Q1-Q11.
 - 2026-10-14 : folded Q1-Q11. G7 already wiped; same tunnel with the JSON moved (downtime fine); fresh clones plus curated data; SSH key on G4; all toolchains on G7; Tailscale SSH off on G4; no DNS workaround on G7; keep /srv/gramps-web on G4 for 14 days. Found G4 has no git credential helper and no repomgr App key, so private-repo clones on G7 have no read path yet: raised Q12. Q10 left the ~/.claude part open: raised Q13. Rewrote phases 1, 2, 4, 5, 6 for the moved tunnel and fresh clones.
 - 2026-10-14 : folded Q12 (agent forwarding from G4, no credential on G7; added `ssh-add -c` and per-session `-A` as mitigations, and a phase 3 check that forwarding works through Tailscale SSH) and Q13 (memory in repos; all `~/.claude/projects/*/memory/` on G4 are empty, nothing to move). Updated the plans README: public on GitHub, underscore naming, folders for multi-phase efforts.
+- 2026-10-14 : phase 1 started. Reviewed the plan (no corrections; filtered the Tailscale prefs read so no key material reaches a log). Took the G4 snapshot into `~/saved_state_g4/`. Read UFW and Tailscale state via handoff. Found fail2ban and the usb-storage block missing despite the doc, and an enabled iperf3 server: raised Q14, Q15. Waiting on the Cloudflare dashboard check.
+- 2026-10-14 : folded Q14 (skip fail2ban and the usb-storage block on G7, fix the doc) and Q15 (no iperf3 on G7) into phase 3. Replaced the manual dashboard check with a read-only API dump script (`~/handoff-logs/g4_to_g7/cf_dump.sh` on G4, output stays local because Access policies hold email addresses).
+- 2026-10-14 : phase 1 done. Cloudflare dump: HSTS on without preload, Full (strict), TLS 1.2, three proxied CNAMEs to the one healthy tunnel (named `pmn-14g4`), and an Access application for each of apex, wildcard and `family`. Nothing in the zone needs changing for the swap. Closing review: no corrections; phase 5 already has no HSTS step since the tunnel is kept.

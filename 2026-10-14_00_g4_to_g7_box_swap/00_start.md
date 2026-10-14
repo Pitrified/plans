@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in progress
 priority: 1
 description: |
   Swap machine roles: G7 is wiped and becomes the unattended box (tunnel, nginx, Gramps Web, Claude sessions);
@@ -200,3 +200,13 @@ Lost with G7, to recreate on G4 in phase 6:
   - Recommended: a, because memory carries knowledge while transcripts are bulky and host-specific.
   - ANS: memories that are useful go into the respective repos, so they are not local to one Claude install.
     Checked 2026-10-14: every `~/.claude/projects/*/memory/` on G4 is empty, so nothing moves now.
+- Q14: Two hardening steps in `01_box_setup.md` phase 1 were never applied on G4: fail2ban and the usb-storage block (findings in `01_prepare.md`).
+  - a. Skip both on G7 and change the doc: fail2ban only when openssh-server is installed; the usb-storage block as optional.
+  - b. Apply both on G7 as the doc says.
+  - Recommended: a, because fail2ban has no log to watch on a box with no sshd and no open port, and blocking USB storage gets in the way on a laptop you may plug a disk into; the doc should describe the box as it is.
+  - ANS: a.
+- Q15: iperf3 runs as an enabled server on G4 (`*:5201`, reachable from Tailscale peers).
+  - a. Do not install it on G7; run `iperf3 -s` by hand when measuring.
+  - b. Install it on G7 like G4.
+  - Recommended: a, because a listening daemon nobody uses is attack surface with no benefit.
+  - ANS: a.
