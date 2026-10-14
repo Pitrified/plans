@@ -1,5 +1,5 @@
 ---
-status: in progress
+status: done
 ---
 
 # Phase 3 - Install G7 as the box
@@ -60,3 +60,11 @@ Context: [`00_start.md`](00_start.md) Q1, Q7, Q9. Depends on [`01_prepare.md`](0
   `RTK.md` removed from dotfiles and its `~/.claude` link removed on G4 and G7. The `rtk` config topic in dotfiles and the `rtk` binary on G4 remain, unused.
 - `setup_gnome.sh` run over ssh against the console session's bus (`DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`).
 - The first apt upgrade left a kernel update pending a reboot.
+- `sensors-detect --auto` (in `setup-always-on.sh`) probed the NVIDIA GPU's USB-C controller over I2C and flooded the kernel log with `i2c timeout` for a minute. Harmless, and it proposed nothing beyond `coretemp`, which loads on its own. Commented out in the script and the doc in `linux-box-cloudflare`.
+- Hardening: Ubuntu Pro attached (esm-apps, esm-infra), UFW deny incoming with no rules (routed shows `disabled` where G4 shows `deny`), sysctl file installed by hand (not via `deploy-configs.sh`, which would also place phase 4 configs), linger on, unattended-upgrades enabled. Tailscale SSH keeps working through UFW; a second session was opened before closing the first.
+- Packages: the G4 manual list minus `iperf3`, `python3-pip`, `apt-transport-https`; calibre with `--no-install-recommends`; cloudflared from its apt repo on `noble`, package only, no service; zellij snap.
+  Removing the nginx default site needed a full `systemctl restart nginx`: a reload kept the master's port 80 sockets open.
+- Toolchains via a user-level script (`~/handoff-logs/03p-toolchains.sh` on G7): Flutter 3.47.7 stable, Android SDK 36, emulator, AVD `fala_api36`, PATH block above the interactivity guard (checked in a non-interactive shell). Two reruns: `yes |` under `pipefail` exits 141 (SIGPIPE), and one SDK download hit `Connection reset`.
+- Agent forwarding through Tailscale SSH works: `ssh -A g7` reaches GitHub, plain `ssh g7` gets `Permission denied`, and G7 holds no key and no agent.
+- Claude Code logged in on G7; box rule linked via `setup-disposable-box.sh`.
+- Not done here: Playwright browsers (installed from the `klide` repo, phase 4), and the lid-closed reboot test (G7 was rebooted lid open; moved to phase 5, once G7 is in its final place).

@@ -23,7 +23,7 @@ Analysis, inventory and open questions in [`00_start.md`](00_start.md).
 | -- | ---------------------------------- | ---------------------------------------------------------- | ------- |
 | 1  | Prepare and close inventory gaps   | [`01_prepare.md`](01_prepare.md)                           | done    |
 | 2  | Make G4 the trusted machine        | [`02_g4_trusted.md`](02_g4_trusted.md)                     | done    |
-| 3  | Install G7 as the box              | [`03_g7_install.md`](03_g7_install.md)                     | in progress |
+| 3  | Install G7 as the box              | [`03_g7_install.md`](03_g7_install.md)                     | done    |
 | 4  | Stage G7                           | [`04_stage_on_g7.md`](04_stage_on_g7.md)                   | draft   |
 | 5  | Cutover                            | [`05_cutover.md`](05_cutover.md)                           | draft   |
 | 6  | Decommission G4's box role         | [`06_decommission_g4.md`](06_decommission_g4.md)           | draft   |
@@ -46,3 +46,4 @@ Append-only. Newest at the bottom.
 - 2026-10-14 : phase 3 started; G7 is freshly installed. Review: the bootstrap README fetched `bootstrap.sh` from `main`, which 404s (branch is `master`), fixed; `install_basics.sh` duplicates `bootstrap.sh`, so it is skipped. Console order: bootstrap.sh, install_tools.sh, then Tailscale up, the rest remote.
 - 2026-10-14 : correction: `install_basics.sh` does not duplicate `bootstrap.sh` (which is only git and a clone); the earlier reading misattributed concatenated output. On G7 it was skipped, so `install_tools.sh` ran without `~/.local/bin` and failed in four places (batcat link, btop needing `make`, `fonts-hack-ttf` gone in 26.04, `p7zip-desktop` snap gone). Fixed `install_tools.sh` and the README order in `~/bootstrap`. G7 joined the tailnet as `g7` with Tailscale SSH; its host key pinned on G4 from `tailscale status`. User authorized running commands on G7 over ssh from this G4 session.
 - 2026-10-14 : phase 3, G7 bootstrap done: install_basics, tools fixups, gitconfig.local, setup_gnome. rtk: hook removed from dotfiles settings at the user's call, rtk install on G7 rolled back. Reboot pending on G7 for the kernel.
+- 2026-10-14 : phase 3 done. G7 hardened (Pro, UFW, sysctl, linger, unattended-upgrades), always-on applied, packages and toolchains installed, Claude logged in, `ssh -A` GitHub path verified both ways. `sensors-detect` dropped from `setup-always-on.sh` after it flooded the log on the NVIDIA laptop. Closing review: lid-closed test moved to phase 5, Playwright to phase 4.

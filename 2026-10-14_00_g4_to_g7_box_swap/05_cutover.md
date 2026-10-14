@@ -19,6 +19,7 @@ Context: [`00_start.md`](00_start.md) Q2, Q11. Depends on [`04_stage_on_g7.md`](
 
 ## Plan
 
+- Before anything else: with G7 in its final place, closed lid, on AC, reboot it and check it comes back on the tailnet (carried over from phase 3).
 - On G4: `systemctl --user disable --now gramps-backup.timer`; `make down` in `genealogy-gramps-fn`; `sudo systemctl disable --now cloudflared`.
   The site is down from here.
 - Copy `/srv/gramps-web` G4 to G7 as root, preserving ownership (sudo tar, scp, sudo untar after moving the rehearsal copy aside). Compare file counts and a checksum of `db/`.
