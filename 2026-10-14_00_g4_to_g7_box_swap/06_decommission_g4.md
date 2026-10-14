@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in progress
 ---
 
 # Phase 6 - Decommission G4's box role
@@ -18,10 +18,12 @@ Context: [`00_start.md`](00_start.md) Q3, Q8, Q11. Depends on [`05_cutover.md`](
 
 ## Plan
 
-- Before deleting anything: copy the restic repository password from G4's `.restic.env` into the new `.admin.env` (see the reissue list in `00_start.md`).
-- G4 services (sudo-handoff): remove `/etc/cloudflared/*.json` (shred) and `config.yml`, `apt remove cloudflared` or leave it masked; disable the `hub` and `cc-kb` nginx sites (or remove nginx); `setfacl -x u:www-data /home/pmn`.
-- Gramps on G4: remove the stopped containers and named volumes; delete `.env`, `.backup.env`, `.restic.env` from the G4 clone.
-  Create `.admin.env` with reissued values: R2 token with delete rights, Cloudflare Access token, Gramps admin credential, repository password.
+- Gate: the user makes an edit in Gramps through the public hostname and sees it persist after a reload (open from phase 5). The tunnel JSON on G4 is the rollback path, so it goes last.
+- Before deleting anything: create `.admin.env` from `.admin.env.example`, with `RESTIC_REPOSITORY` and `RESTIC_PASSWORD` copied from G4's `.restic.env` (the same values also live on G7) and `GRAMPS_BOX_HOST=g7`. Copied by script, never printed.
+  The rest is reissued by the user per `genealogy-gramps-fn/docs/admin-machine.md` steps 4-6: Gramps admin account, R2 token with delete rights, Cloudflare Access token. Admin targets fail until then.
+- Gramps on G4: `docker compose down -v` (stopped containers and the four named volumes), remove the `grampsweb`, `valkey` and `hello-world` images (about 6.8 GB); delete `.env`, `.backup.env`, `.restic.env` from the G4 clone.
+- G4 services (sudo-handoff): `cloudflared service uninstall`, shred `/etc/cloudflared/*.json`, remove `config.yml`. The `cloudflared` package stays: G4 is the management machine and needs the CLI.
+  nginx: remove the `hub` and `cc-kb` links in `sites-enabled` and `/var/www`, `systemctl disable --now nginx`. `setfacl -x u:www-data /home/pmn`.
   Keep `/srv/gramps-web` on G4 for 14 days after the first verified G7 backup, then delete it (Q11). Log the deletion date.
 - `rm ~/.claude/rules/local-box.md` on G4 (the box rule no longer describes it).
 - Remote access to G4 (Q8, Q16). While Tailscale SSH is on it answers port 22 on the tailnet address itself, so openssh-server cannot be tested from another device until it is off, and turning it off may drop Tailscale SSH sessions:
@@ -41,3 +43,25 @@ Context: [`00_start.md`](00_start.md) Q3, Q8, Q11. Depends on [`05_cutover.md`](
 - On G4: no `/etc/cloudflared/*.json`; no listener on 8090, 8091, 8092; `docker ps -a` empty; `tailscale debug prefs` shows `RunSSH: false`; ssh to G4 over Tailscale reaches openssh-server.
 - In `genealogy-gramps-fn`: `make ps` refuses on G4 and works on G7; an admin target is accepted on G4.
 - The site still serves from G7 with G4 powered off.
+
+## What the implementation found
+
+- Gramps edit check passed on G7 through the public hostname: the edit persisted after a reload.
+- `.admin.env` on G4 created from the template by a script, mode 600: `GRAMPS_BOX_HOST=g7`, `GRAMPS_BOX_USER=pmn`, restic repository and password copied from `.restic.env` (compared equal without printing). Eight values remain placeholders for the user to reissue.
+  `make ps` now refuses on G4 ("this machine has .admin.env") and works on G7.
+- G4 Docker: `docker compose down -v` and three images removed (about 6.8 GB). Zero containers, volumes, images.
+- The permission layer blocks Claude commands that delete or even list `.env` files (the `Read(**/.env)` deny rule matches them): the user deleted `.env`, `.backup.env`, `.restic.env` on G4.
+- G4 teardown (user, `06a-g4-teardown.log`): `cloudflared service uninstall`, tunnel JSON shredded (rollback ended here), `config.yml` removed, nginx sites and `/var/www` links removed, nginx disabled, `www-data` ACL removed. No listener on 80 or 8090-8092. The `cloudflared` package stays for management.
+- `/srv/gramps-web.rehearsal` deleted on G7. Box rule link removed from G4's `~/.claude/rules/`.
+- Remote access: openssh-server on G4 with a hardening drop-in (`PermitRootLogin no`, `AllowUsers pmn`, `MaxAuthTries 3`, `X11Forwarding no`), password login kept, UFW allows 22 on `tailscale0` only; `ssh pmn@localhost` tested before `tailscale set --ssh=false`. Port 22 answers over the tailnet; `RunSSH` is false.
+  A "temporary failure in name resolution" from G7 was a false alarm: the user's retry logged in from G7 to G4 with the password, and G7 resolves `pmn-14g4` with MagicDNS.
+  G7 can reach G4's sshd (password only). A Tailscale ACL could block G7 to G4 on port 22; not done.
+- Docs: `01_box_setup.md` gets fail2ban as conditional on openssh-server and the usb-storage block as optional (`00_start.md` Q14, owed since phase 3), and a "Moving the box, same tunnel" section describing this cutover.
+
+Still open, with the user:
+
+- Revoke the fine-grained GitHub PAT that lived on the old G7.
+- Reissue the three admin credentials into `.admin.env` (`genealogy-gramps-fn/docs/admin-machine.md` steps 4-6).
+- Delete `/srv/gramps-web` on G4 on or after 2026-10-28 (14 days after the first G7 backup, Q11).
+- Lid-closed reboot test of G7.
+- Optional: revert G4's always-on lid setting and linger; fixed restic `--host` in `backup_run.sh`.

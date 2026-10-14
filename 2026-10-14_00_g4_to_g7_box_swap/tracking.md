@@ -26,7 +26,7 @@ Analysis, inventory and open questions in [`00_start.md`](00_start.md).
 | 3  | Install G7 as the box              | [`03_g7_install.md`](03_g7_install.md)                     | done    |
 | 4  | Stage G7                           | [`04_stage_on_g7.md`](04_stage_on_g7.md)                   | done    |
 | 5  | Cutover                            | [`05_cutover.md`](05_cutover.md)                           | done    |
-| 6  | Decommission G4's box role         | [`06_decommission_g4.md`](06_decommission_g4.md)           | draft   |
+| 6  | Decommission G4's box role         | [`06_decommission_g4.md`](06_decommission_g4.md)           | in progress |
 
 Status values: draft / planned / in progress / done / superseded / discarded.
 
@@ -51,3 +51,5 @@ Append-only. Newest at the bottom.
 - 2026-10-14 : phase 4 done, closed on matching Gramps counts instead of a login test. Closing review: phase 5 must stop G7's rehearsal stack before replacing its data, and copies the frozen data by the same tar route as the rehearsal.
 - 2026-10-14 : phase 5 started. Lid-closed reboot test skipped for now at the user's call; still open.
 - 2026-10-14 : phase 5 done. G7 serves all three hostnames through the same tunnel, verified from a phone on mobile data; frozen Gramps data matches; first G7 backup to R2 clean. G4 keeps the stopped stack, its tunnel JSON and /srv/gramps-web for rollback until phase 6. Open: lid-closed reboot test, Gramps edit-and-reload check, fixed restic --host (phase 6).
+- 2026-10-15 : phase 6 started on the user's call, without the few days of G7 running alone. Review corrections: keep the cloudflared package on G4 (management CLI); `.admin.env` can only be partly filled (restic values, box host), the three admin credentials are reissued by the user; G4 Docker images and volumes added to the cleanup; the Gramps edit check gates the deletion of G4's tunnel JSON, which ends rollback.
+- 2026-10-15 : phase 6 mostly done. G4 holds no box service or box-only secret: tunnel JSON shredded, nginx and Docker leftovers gone, admin env started. G4 reached through openssh-server on the tailnet, Tailscale SSH off. Docs: Q14 changes and the same-tunnel move procedure. Open items with the user listed in `06_decommission_g4.md`; the phase stays in progress until they close.
