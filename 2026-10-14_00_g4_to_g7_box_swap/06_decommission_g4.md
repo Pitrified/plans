@@ -60,8 +60,9 @@ Context: [`00_start.md`](00_start.md) Q3, Q8, Q11. Depends on [`05_cutover.md`](
 
 Still open, with the user:
 
-- Revoke the fine-grained GitHub PAT that lived on the old G7.
+- ~~Revoke the fine-grained GitHub PAT that lived on the old G7.~~ The user decided not to revoke it (2026-10-15); its only copy was on the wiped disk.
 - Reissue the three admin credentials into `.admin.env` (`genealogy-gramps-fn/docs/admin-machine.md` steps 4-6).
+  The three Cloudflare ids (account, `Family Tree App`, `Allow Gramps` policy) were filled from the phase 1 dump; five secret values remain: Gramps admin user and password, R2 delete key id and secret, Cloudflare API token.
 - Delete `/srv/gramps-web` on G4 on or after 2026-10-28 (14 days after the first G7 backup, Q11).
 - Lid-closed reboot test of G7.
 - Optional: revert G4's always-on lid setting and linger; fixed restic `--host` in `backup_run.sh`.
