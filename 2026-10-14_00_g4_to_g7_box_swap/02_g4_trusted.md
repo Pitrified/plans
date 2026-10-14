@@ -22,9 +22,9 @@ Context: [`00_start.md`](00_start.md) Q4, Q5, Q8. Depends on [`01_prepare.md`](0
   `ssh-keygen -t ed25519 -C "pmn@g4"` with a passphrase; register in GitHub as an authentication key; `ssh -T git@github.com`.
   `ssh-add -c` for the key, so agent-forwarded use from G7 asks for confirmation on G4 (Q12).
   Switch remotes to ssh on G4 (`git remote set-url`), every repo plus `~/dotfiles`, `~/bootstrap`.
-- Push unpushed work: `genealogy-gramps-fn` main, `epub-fixer`, `klide`, `pose-tools`, `house-renderer` (ahead branches, the 7 local-only branches, 3 dirty files), `flutter-setup-project` local-only branches, `plans`.
+- Push unpushed work: `genealogy-gramps-fn` main, `epub-fixer`, `klide`, `pose-tools`, `house-renderer` (ahead branches, the 7 local-only branches, 3 dirty files), `flutter-setup-project` local-only branches, `plans`, `~/bootstrap`.
   For each local-only branch: push, or write it down as dropped.
-  Rerun the dirty/ahead/no-upstream scan from the inventory; it must come back empty or every leftover accepted in the log.
+  Rerun the dirty/ahead/no-upstream scan from the inventory over `~/repos`, `~/dotfiles` and `~/bootstrap`; it must come back empty or every leftover accepted in the log.
 - `va` in `~/repos` is not a git repo: decide whether it is data to copy in phase 4 or dust.
 - Browser logins on G4 as needed: GitHub, Cloudflare dashboard, Claude, Google.
 - Update `linux-box-cloudflare/configs/claude/rules/local-box.md`: no GitHub credentials live on the box; pushes happen from G4, or from the box only inside an `ssh -A` session from G4; unattended sessions cannot push. Replace the `g7` mention. Commit and push from G4.
