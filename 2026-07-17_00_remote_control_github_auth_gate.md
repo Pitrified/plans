@@ -1,6 +1,6 @@
 # Remote Control blocked by GitHub repo access check
 
-Diagnosed 2026-07-17. Companion to `2026-06-24-01-remote-control-recovery.md`,
+Diagnosed 2026-07-17. Companion to `2026-06-24_01_remote_control_recovery.md`,
 which covers hangs/disconnects and does **not** cover this cause.
 
 ## Goal

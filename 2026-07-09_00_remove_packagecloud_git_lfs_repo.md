@@ -12,7 +12,7 @@ by removing that repo entirely - git-lfs already comes from Ubuntu's own repos.
 - The repo was added by `~/bootstrap/install_git_lfs.sh`, which runs the packagecloud
   installer (`curl .../script.deb.sh | sudo bash`). It wrote
   `/etc/apt/sources.list.d/github_git-lfs.list` pinned to codename `resolute`.
-  See plan `2026-07-01-00-install-git-lfs.md`.
+  See plan `2026-07-01_00_install_git_lfs.md`.
 - This box is Ubuntu 26.04 "resolute" (new). packagecloud has not built git-lfs for
   `resolute` yet, so the Release file 404s. The install script hardcoded the current
   codename, which has no upstream build.
@@ -42,7 +42,7 @@ with a plain Ubuntu install:
 - drop the `curl ... packagecloud ... | sudo bash` line
 - keep `sudo apt-get install -y git-lfs` (now resolves from Ubuntu universe/ESM)
 - keep `git lfs install --skip-repo` and `git lfs version`
-- update the plan note `2026-07-01-00-install-git-lfs.md` decision text to reflect
+- update the plan note `2026-07-01_00_install_git_lfs.md` decision text to reflect
   Ubuntu-repo install (optional; historical note).
 - Push happens from a g7 session, not this box.
 

@@ -24,8 +24,6 @@ One file per change, covering Goal / Decisions / Steps / Rollback.
 Date then `NN` then slug means a plain alphabetical sort is also chronological order.
 Example: `2026-08-25_00_install_restic.md`.
 
-Notes before 2026-08 use dashes (`2026-06-24-00-keep-box-always-on.md`); they are kept as they are.
-
 ## Multi-phase efforts
 
 Work that spans several phases or sessions gets a folder with the same naming, following the `tracked-development` skill:

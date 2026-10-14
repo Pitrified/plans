@@ -28,7 +28,7 @@ to end (install, tap, screenshot, read logs) without the Pixel and without a g7 
 - **x86_64, not arm64 emulation.** KVM accelerates same-architecture guests only; an arm64 image on
   this x86_64 host would be full emulation.
 - **Install with `sdkmanager` into `~/android-sdk`**, matching the existing toolchain
-  (`~/repos/plans/2026-07-07-00-install-flutter.md`). Not apt, not a snap: the SDK is user-local and
+  (`~/repos/plans/2026-07-07_00_install_flutter.md`). Not apt, not a snap: the SDK is user-local and
   `flutter` already looks there.
 - **Headless launch wrapped in a script in the repo**, not a shell alias, so the flags are versioned
   with the project that needs them: `-no-window -gpu swiftshader_indirect -no-audio -no-boot-anim`.
