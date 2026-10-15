@@ -71,7 +71,8 @@ Still open, with the user:
   G7 refuses `systemctl reboot` over ssh without interactive authentication, so the user rebooted it with `ssh -t` and sudo.
   It came back on the tailnet with the lid closed and nobody logged in. cloudflared had 4 registered connections and no errors; nginx, Docker, the three Gramps containers and the user backup timer (linger) were up; 8090, 8091 and 8092 answered 200 on loopback; no failed units.
   The public path was not re-tested, since a curl only reaches Access at the edge.
-- Optional: revert G4's always-on lid setting and linger.
+- ~~Optional: revert G4's always-on lid setting and linger.~~ Done 2026-10-15, following `always-on-server.md` Reverting: GNOME `lid-close-ac-action` reset to `suspend`, logind drop-in removed and logind restarted (user), `loginctl disable-linger`.
+  The logind restart broke the running GNOME session, leaving only a text console; the doc now warns about it. The user reboots G4 later, which also clears the stale `gramps-backup.timer` entry from the user manager.
 - ~~Fixed restic `--host` in `backup_run.sh`.~~ Done 2026-10-15: backups run with `--host gramps-box`.
   Correction to phase 5: G4's snapshots would not have aged out as their own group. restic counts the most recent days that hold a snapshot, so a group that stops growing keeps up to 14 + 12 + 24 snapshots forever.
   So the existing snapshots were renamed too (61 from `pmn-14G4`, 2 from `g7`). The permission layer blocks Claude from `restic rewrite --forget`, so the user ran it after a clean dry run. Result: 63 snapshots, all `gramps-box`, and `make backup-check` found no errors.
