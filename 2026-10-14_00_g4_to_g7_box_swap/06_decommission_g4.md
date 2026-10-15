@@ -68,4 +68,8 @@ Still open, with the user:
   `make admin-verify` on G4: ready, every check passing, including the Cloudflare one, so the Access token was not in its switched-off state at that moment.
 - Delete `/srv/gramps-web` on G4 on or after 2026-10-28 (14 days after the first G7 backup, Q11).
 - Lid-closed reboot test of G7.
-- Optional: revert G4's always-on lid setting and linger; fixed restic `--host` in `backup_run.sh`.
+- Optional: revert G4's always-on lid setting and linger.
+- ~~Fixed restic `--host` in `backup_run.sh`.~~ Done 2026-10-15: backups run with `--host gramps-box`.
+  Correction to phase 5: G4's snapshots would not have aged out as their own group. restic counts the most recent days that hold a snapshot, so a group that stops growing keeps up to 14 + 12 + 24 snapshots forever.
+  So the existing snapshots were renamed too (61 from `pmn-14G4`, 2 from `g7`). The permission layer blocks Claude from `restic rewrite --forget`, so the user ran it after a clean dry run. Result: 63 snapshots, all `gramps-box`, and `make backup-check` found no errors.
+  G7's clone pulled with a rebase. Its local tree snapshot commit stays unpushed, as usual. shellcheck installed on G4; it passes on `backup_run.sh` and `prune_run.sh`.
