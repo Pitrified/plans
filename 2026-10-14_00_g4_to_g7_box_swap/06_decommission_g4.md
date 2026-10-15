@@ -67,7 +67,10 @@ Still open, with the user:
   The username is not a secret, so the template now names `admin-scripts` and says role Owner.
   `make admin-verify` on G4: ready, every check passing, including the Cloudflare one, so the Access token was not in its switched-off state at that moment.
 - Delete `/srv/gramps-web` on G4 on or after 2026-10-28 (14 days after the first G7 backup, Q11).
-- Lid-closed reboot test of G7.
+- ~~Lid-closed reboot test of G7.~~ Done 2026-10-15. Before the reboot: lid closed, on AC, logind set to ignore the lid on external power.
+  G7 refuses `systemctl reboot` over ssh without interactive authentication, so the user rebooted it with `ssh -t` and sudo.
+  It came back on the tailnet with the lid closed and nobody logged in. cloudflared had 4 registered connections and no errors; nginx, Docker, the three Gramps containers and the user backup timer (linger) were up; 8090, 8091 and 8092 answered 200 on loopback; no failed units.
+  The public path was not re-tested, since a curl only reaches Access at the edge.
 - Optional: revert G4's always-on lid setting and linger.
 - ~~Fixed restic `--host` in `backup_run.sh`.~~ Done 2026-10-15: backups run with `--host gramps-box`.
   Correction to phase 5: G4's snapshots would not have aged out as their own group. restic counts the most recent days that hold a snapshot, so a group that stops growing keeps up to 14 + 12 + 24 snapshots forever.
