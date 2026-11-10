@@ -8,5 +8,7 @@ mkdir -p "$logs"
 
 sudo apt-get update 2>&1 | tee "$logs/12a-apt-update.log"
 sudo apt-get install -y cuda-toolkit colmap 2>&1 | tee "$logs/12b-apt-cuda-colmap.log"
+# colmap 3.12.6-4 links libPoseLib.so without depending on the package that ships it.
+sudo apt-get install -y libposelib 2>&1 | tee "$logs/12c-apt-libposelib.log"
 
-echo "done; logs in $logs/12a-apt-update.log and $logs/12b-apt-cuda-colmap.log"
+echo "done; logs in $logs/12a-12c"
