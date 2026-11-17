@@ -34,6 +34,33 @@ Read-only first, then one state change per call.
    The first open builds `Library/` and takes a while; it is one command, not a sweep.
 7. Write what was found back into this note: paths, sizes, versions, what the licence step needed.
 
+## What the run found, 2026-11-17
+
+Approved by the user and carried out the same day. Every step passed; the editor runs on Ubuntu 26.04 despite not being on the supported list.
+
+- **CLI**: Unity CLI 1.0.1 in `~/.local/bin/unity`. Install script read first, checksum verified by the script.
+  Run with `UNITY_CLI_SKIP_SETUP=1`, because by default it ends with `unity skill install --all`, which installs Unity's agent skills into every AI client found, Claude Code included; that was not in this note.
+  `~/.bashrc` and `~/.profile` hash the same before and after: `~/.local/bin` was already persistently on PATH, so the script edited no rc file.
+  Usage analytics turned off with `unity analytics opt-out`; the CLI otherwise sends them by default.
+- **Editor**: `unity install 6000.4.4f1 --changeset 360f97ecca93 -m android --cm --accept-eula --non-interactive`.
+  About 7.3 GB downloaded at about 3 MB/s, one retried download. Installed at `~/Unity/Hub/Editor/6000.4.4f1/`, 18 GB on disk with the modules: Android Build Support, OpenJDK 17.0.9, NDK r27c, CMake 3.22.1, SDK build-tools and platform-tools 36.0.0, platforms 34 to 36, command-line tools 16.0. The download cache was emptied by the install.
+- **Xvfb**: `xvfb` 2:21.1.22-1ubuntu1.3, by the user (`~/handoff-logs/14a-apt-xvfb.log`).
+- **Licence**: the user ran `unity auth login` and `unity license activate --personal --accept-eula`; `unity license status` shows Unity Personal and Asset Store, assigned. Batch runs log `[Licensing::Module] Error: Access token is unavailable; failed to update` and work regardless.
+- **First open** of a scratch clone of unity-setup-project (`91c71db`) in batch mode: about 200 s of import, exit 0.
+  The first compile failed inside the Shader Graph package (`error CS0246: 'GUID' could not be found`, two files in `Library/PackageCache/com.unity.shadergraph@ba64c3eae297`); Unity's API updater rewrote 8 files of that package and the next two compiles succeeded. A first-import artefact, absent from every later run.
+  The project's own code compiles with one warning, CS4014 at `Assets/Scripts/Core/GameBootstrap.cs:139`, a repo finding.
+- **EditMode tests**: `-batchmode -nographics -runTests -testPlatform EditMode`: 114 of 114 passed.
+- **PlayMode tests**: under `xvfb-run` with `-force-vulkan`: 3 of 3 passed (boot, menu, game, menu loop; pause and resume; save and continue).
+- **Rendering headless**, with a scratch editor script that renders a cube through a camera into a PNG:
+  - `-batchmode` with no X display: the editor does not start (`Error opening default X display`, from GTK). Xvfb is needed even for batch mode with rendering.
+  - `xvfb-run -a -s "-screen 0 1280x1024x24"` with `-batchmode`: renders, but on Mesa `llvmpipe` through OpenGL Core, which is the CPU.
+  - The same with `-force-vulkan`: renders on the Quadro RTX 3000 through Vulkan, NVIDIA driver 595.99.02. **This is the combination to use**: `xvfb-run ... Unity -batchmode -force-vulkan ...`.
+- **Android dev build**: `Tools/build-android.sh dev` built `artificial-pi-dev.apk`, 70 MB, `arm64-v8a` only, target SDK 35, in 6 min 25 s with a cold IL2CPP cache. The existing `~/.android/debug.keystore` signed it.
+  It needed `UNITY_PATH` set: the script's editor auto-detect never finds anything, a repo bug (it builds NUL-separated paths with `echo -n "$p"$'\0'`, but a bash string cannot hold a NUL, so `read -d ''` gets no delimiter and the loop body never runs).
+  The APK still has the Unity template package id, `com.UnityTechnologies.com.unity.template.urpblank`.
+- **Not done**: installing the APK on a device (no device attached to the box); `profile` and `release` builds.
+- **Scratch left behind**: the clone, logs and APK in the session's scratchpad, which goes with the session.
+
 ## Pause
 
 Installs a large tool and a licence tied to an account: approval before step 2.
